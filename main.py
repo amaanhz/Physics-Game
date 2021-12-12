@@ -523,6 +523,7 @@ class Player(PhysObject):
     def __init__(self, pos, image, mass):
         super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT)
 
+def getCameraTrack(pos, lwidth, lheight):
 
 
 objects = [PhysObject((100, 100), ball_image, 60, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
@@ -567,6 +568,12 @@ while True:
         base.x, base.y = (base.x * math.cos(rads)) - (base.y * math.sin(rads)),\
                  -((base.x * math.sin(rads)) + (base.y * math.cos(rads)))
         player.AddForce(player, "Drive", base)
+    elif keys[pygame.K_LSHIFT]:
+        base = Vec2(0, 1000)
+        rads = player.angle * RAD
+        base.x, base.y = -((base.x * math.cos(rads)) - (base.y * math.sin(rads))),\
+                 (base.x * math.sin(rads)) + (base.y * math.cos(rads))
+        player.AddForce(player, "Drive", base)
 
     if keys[pygame.K_d]:
         ball.Rotate(1, world + [x for x in objects if x != object])
@@ -583,6 +590,8 @@ while True:
             sys.exit()
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_SPACE:
+                player.RemoveForce(player, "Drive")
+            if event.key == pygame.K_LSHIFT:
                 player.RemoveForce(player, "Drive")
             if event.key == pygame.K_j:
                 ball.RemoveForce(ball, "Drive")
