@@ -523,7 +523,21 @@ class Player(PhysObject):
     def __init__(self, pos, image, mass):
         super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT)
 
-def getCameraTrack(pos, lwidth, lheight):
+def getCameraTrack(pos, lpos, lwidth , lheight):
+    x, y = pos
+    swidth, sheight = WINDOW_SIZE
+    halfw, halfh = swidth / 2, sheight / 2
+    maxWidthOffset = lwidth - swidth
+    newlpos = [0, 0]
+
+    if x + halfw > swidth and lpos[0] > -maxWidthOffset:
+        difference = x + halfw - swidth
+        newlpos[0] = lpos[0] - difference
+    elif x - halfw < 0 and lpos[0] < 0:
+        difference = abs(x - halfw)
+        newlpos[0] = lpos[0] + difference
+
+    # Y VALUES
 
 
 objects = [PhysObject((100, 100), ball_image, 60, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
