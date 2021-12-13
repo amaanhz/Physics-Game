@@ -528,6 +528,7 @@ def getCameraTrack(pos, lpos, lwidth , lheight):
     swidth, sheight = WINDOW_SIZE
     halfw, halfh = swidth / 2, sheight / 2
     maxWidthOffset = lwidth - swidth
+    maxHeightOffset = lheight - sheight
     newlpos = [0, 0]
 
     if x + halfw > swidth and lpos[0] > -maxWidthOffset:
@@ -537,7 +538,12 @@ def getCameraTrack(pos, lpos, lwidth , lheight):
         difference = abs(x - halfw)
         newlpos[0] = lpos[0] + difference
 
-    # Y VALUES
+    if y + halfh > sheight and lpos[1] > -maxHeightOffset:
+        difference = y + halfh - sheight
+        newlpos[1] = lpos[1] - difference
+    elif y - halfw < 0 and lpos[0] < 0:
+        difference = abs(y - halfh)
+        newlpos[1] = lpos[1] + difference
 
 
 objects = [PhysObject((100, 100), ball_image, 60, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
