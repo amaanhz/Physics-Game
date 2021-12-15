@@ -13,7 +13,7 @@ WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
 
-WINDOW_SIZE = (1440, 960)
+WINDOW_SIZE = (1280, 720)
 FPS = 100
 
 RAD = math.pi / 180
@@ -391,6 +391,9 @@ class PhysObject:
             image_rect.center = self.rect.center
             pygame.draw.rect(screen, YELLOW, image_rect, 1)
 
+    def GetPos(self):
+        return self.pos
+
     def GetRect(self):
         return self.rect
 
@@ -524,12 +527,12 @@ class Player(PhysObject):
         super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT)
 
 def getCameraTrack(pos, lpos, lwidth , lheight):
-    x, y = pos
+    x, y = pos.x, pos.y
     swidth, sheight = WINDOW_SIZE
     halfw, halfh = swidth / 2, sheight / 2
     maxWidthOffset = lwidth - swidth
     maxHeightOffset = lheight - sheight
-    newlpos = [0, 0]
+    newlpos = list(lpos)
 
     if x + halfw > swidth and lpos[0] > -maxWidthOffset:
         difference = x + halfw - swidth
@@ -544,6 +547,7 @@ def getCameraTrack(pos, lpos, lwidth , lheight):
     elif y - halfw < 0 and lpos[0] < 0:
         difference = abs(y - halfh)
         newlpos[1] = lpos[1] + difference
+    return newlpos
 
 
 objects = [PhysObject((100, 100), ball_image, 60, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
@@ -558,13 +562,16 @@ player.SetWeightless(False)
 
 ball = objects[0]
 
+lPos = (0, 0)
+
 while True:
     clock.tick()
     now = time.time()
     dt = now - prev_time
     prev_time = now
 
-    screen.blit(background_image, (0, 0))
+    lPos = getCameraTrack(player.GetPos(), lPos, background_image.get_size()[0], background_image.get_size()[1])
+    screen.blit(background_image, tuple(lPos))
 
     font = pygame.font.Font(None, 30)
     render_fps = font.render(str(int(clock.get_fps())), True, WHITE)
