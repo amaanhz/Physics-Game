@@ -541,12 +541,13 @@ def getCameraTrack(pos, lpos, lwidth , lheight):
         difference = abs(x - halfw)
         newlpos[0] = lpos[0] + difference
 
-    if y + halfh > sheight and lpos[1] > -maxHeightOffset:
-        difference = y + halfh - sheight
-        newlpos[1] = lpos[1] - difference
-    elif y - halfw < 0 and lpos[0] < 0:
-        difference = abs(y - halfh)
-        newlpos[1] = lpos[1] + difference
+    # if y - halfh < 0 and lpos[1] > -maxHeightOffset:
+    #     difference = y - halfh + sheight
+    #     newlpos[1] = max(lpos[1] + difference, -maxHeightOffset)
+    # elif y + halfh > sheight and lpos[1] < 0:
+    #     difference = abs(y - halfh)
+    #     newlpos[1] = lpos[1] + difference
+
     return newlpos
 
 
