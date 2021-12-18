@@ -7,7 +7,7 @@ pygame.init()
 
 pygame.display.set_caption("Physics")
 
-DEBUG = True
+DEBUG = False
 
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
@@ -88,7 +88,7 @@ def identity(n):
 
 class Vec2:
     def __init__(self, *args):
-        if len(args) == 1 and isinstance(args[0], tuple):
+        if len(args) == 1 and (isinstance(args[0], tuple) or isinstance(args[0], list)):
             self.x, self.y = args[0]
         elif len(args) == 2:
             self.x, self.y = args[0], args[1]
@@ -355,6 +355,10 @@ class WorldCollider:
         self.material = MATERIALS[material]
     def GetRect(self):
         return self.rect
+    def GetPos(self):
+        return self.rect.topleft
+    def Move(self, delta):
+        self.rect.topleft = tuple(numpy.add(self.GetPos(), delta))
     def GetMaterial(self):
         return self.material
     def GetMuStatic(self):
@@ -393,6 +397,9 @@ class PhysObject:
 
     def GetPos(self):
         return self.pos
+
+    def SetPos(self, p):
+        self.pos = p
 
     def GetRect(self):
         return self.rect
@@ -527,6 +534,7 @@ class Player(PhysObject):
         super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT)
 
 def getCameraTrack(pos, lpos, lwidth , lheight):
+
     x, y = pos.x, pos.y
     swidth, sheight = WINDOW_SIZE
     halfw, halfh = swidth / 2, sheight / 2
@@ -541,14 +549,13 @@ def getCameraTrack(pos, lpos, lwidth , lheight):
         difference = abs(x - halfw)
         newlpos[0] = lpos[0] + difference
 
-    # if y - halfh < 0 and lpos[1] > -maxHeightOffset:
-    #     difference = y - halfh + sheight
-    #     newlpos[1] = max(lpos[1] + difference, -maxHeightOffset)
-    # elif y + halfh > sheight and lpos[1] < 0:
-    #     difference = abs(y - halfh)
-    #     newlpos[1] = lpos[1] + difference
-
-    return newlpos
+    if y - halfh < 0 and lpos[1] > -maxHeightOffset:
+        difference = y - halfh
+        newlpos[1] = lpos[1] + difference
+    elif y + halfh > sheight and lpos[1] < 0:
+        difference = y + halfh - sheight
+        newlpos[1] = lpos[1] + difference
+    return [round(a) for a in newlpos]
 
 
 objects = [PhysObject((100, 100), ball_image, 60, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
@@ -563,7 +570,7 @@ player.SetWeightless(False)
 
 ball = objects[0]
 
-lPos = (0, 0)
+lPos = [0, 0]
 
 while True:
     clock.tick()
@@ -571,7 +578,17 @@ while True:
     dt = now - prev_time
     prev_time = now
 
+    oldLPos = lPos
     lPos = getCameraTrack(player.GetPos(), lPos, background_image.get_size()[0], background_image.get_size()[1])
+
+    # move game objects accordingly with the level
+    diff = list(numpy.subtract(lPos, oldLPos)) # convert the numpy array to a regular list
+    player.SetPos(player.GetPos() + Vec2(diff)) # PhysObjects can be moved via vector addition
+    for object in objects:
+        object.SetPos(object.GetPos() + Vec2(diff))
+    for wc in world: # Worldcolliders are tracked by rects only, so use numpy list subtraction
+        wc.Move(diff)
+
     screen.blit(background_image, tuple(lPos))
 
     font = pygame.font.Font(None, 30)
@@ -580,7 +597,7 @@ while True:
     render_mousepos = font.render(str(pygame.mouse.get_pos()), True, WHITE)
     screen.blit(render_mousepos, (500, 0))
 
-    colliders = world + objects
+    colliders = world + objects # Everything the player can collide with
 
     player.Update(colliders, dt)
     player.Draw(screen)
@@ -611,6 +628,11 @@ while True:
         ball.AddForce(ball, "Drive", Vec2(1000, 0))
     elif keys[pygame.K_h]:
         ball.AddForce(ball, "Drive", Vec2(-1000, 0))
+
+    if keys[pygame.K_MINUS]:
+        lPos[0] = lPos[0] - 1
+    elif keys[pygame.K_EQUALS]:
+        lPos[0] = lPos[0] + 1
 
     for event in pygame.event.get():
         if event.type == QUIT:
