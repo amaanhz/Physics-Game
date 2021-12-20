@@ -81,6 +81,7 @@ def touchingany(ent, colliders):
     return collisions
 
 def identity(n):
+    """Returns the normalised version of the vector or number that is input. E.g: (-500, 0) becomes (-1,0)"""
     if n != 0:
         return n / abs(n)
     else:
@@ -244,30 +245,11 @@ class ForceManager:
         ## ADD NORMAL FORCE IF THERE IS AN OPPOSING FORCE ##
         for result in touching:
             ent, side = result
-            ## Handle a collision with a PhysObject ##
-            if not isinstance(ent, WorldCollider):
-                if side == "left" or side == "right":
-                    if identity(rForce.x) == dir[side].x:
-                        ent.AddForce(parent, "CollisionX", Vec2(rForce.x, 0))
-                    else:
-                        initialparentv = parent.velocity.x
-                        initialentv = ent.velocity.x
-                        parent.velocity.x = -(parent.mass/ent.mass) * initialentv
-                        ent.velocity.x = -(ent.mass/parent.mass) * initialparentv
-                if side == "top" or side == "bottom":
-                    if identity(rForce.y) == dir[side].y:
-                        ent.AddForce(parent, "CollisionY", Vec2(0, rForce.y))
-                    else:
-                        initialparentv = parent.velocity.y
-                        initialentv = ent.velocity.y
-                        parent.velocity.y = -(parent.mass/ent.mass) * initialentv
-                        ent.velocity.y = -(ent.mass/parent.mass) * initialparentv
-
-
-            if side == "left" or side == "right" and identity(rForce.x) == dir[side].x:
-                self.AddForce(ent, "ReactionX", -rForce.x, 0)
-            elif side == "top" or side == "bottom" and identity(rForce.y) == dir[side].y:
-                self.AddForce(ent, "ReactionY", 0, -rForce.y)
+            if isinstance(ent, WorldCollider):
+                if side == "left" or side == "right" and identity(rForce.x) == dir[side].x:
+                    self.AddForce(ent, "ReactionX", -rForce.x, 0)
+                elif side == "top" or side == "bottom" and identity(rForce.y) == dir[side].y:
+                    self.AddForce(ent, "ReactionY", 0, -rForce.y)
 
         ## ADD AIR RESISTANCE ##
         if v.GetSqrMag() > 0:  # If moving
@@ -318,7 +300,7 @@ class ForceManager:
         for force in self.forces:
             self.rForce += force  # Sum all the forces acting on the body
 
-        parent.acceleration = self.rForce / parent.mass
+        parent.acceleration = self.rForce / parent.mass # a = F/m
         resultantv = parent.velocity + parent.acceleration * dt
 
         #### PREVENT FRICTION CAUSING OPPOSING MOTION ####
@@ -426,6 +408,8 @@ class PhysObject:
         if round(self.velocity.y, 1) == 0 and identity(self.velocity.y) != identity(self.rForce.y):
             self.velocity.y = 0
 
+        self.momentum = self.velocity * self.mass
+
         ##################################################
         if DEBUG:
             print(f"Resultant Force: {str(self.rForce)}")
@@ -437,7 +421,7 @@ class PhysObject:
 
         ##################################################
 
-        self.momentum = self.velocity * self.mass
+
 
         collision_types = {"top": False, "bottom": False, "left": False, "right": False}
 
@@ -449,15 +433,15 @@ class PhysObject:
         hit_list = coltest(self.rect, colliders)
 
         for entity in hit_list:
-            if self.velocity.x > 0:
-                self.rect.right = entity.GetRect().left
-                self.pos = Vec2(self.rect.topleft)
-                collision_types["right"] = True
-
-            elif self.velocity.x < 0:
-                self.rect.left = entity.GetRect().right
-                self.pos = Vec2(self.rect.topleft)
-                collision_types["left"] = True
+        #     if self.velocity.x > 0:
+        #         self.rect.right = entity.GetRect().left
+        #         self.pos = Vec2(self.rect.topleft)
+        #         collision_types["right"] = True
+        #
+        #     elif self.velocity.x < 0:
+        #         self.rect.left = entity.GetRect().right
+        #         self.pos = Vec2(self.rect.topleft)
+        #         collision_types["left"] = True
 
             if isinstance(entity, WorldCollider):
                 if self.COR > 0:
@@ -533,6 +517,22 @@ class Player(PhysObject):
     def __init__(self, pos, image, mass):
         super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT)
 
+class Collision:
+    def __init__(self, object, colliders):
+        self.object = object
+        self.colliders = colliders
+    def Resolve(self):
+        obj1 = self.object
+        for obj2 in self.colliders:
+            pTotal = obj1.momentum + obj2.momentum
+            finalObj1V = obj2.velocity - obj1.velocity # + finalObj2V
+            pTotal = pTotal - (finalObj1V * obj1.mass)
+            finalObj2V = pTotal / (obj1.mass + obj2.mass)
+            finalObj1V = finalObj1V + finalObj2V
+            obj1.SetVelocity(finalObj1V)
+            obj2.SetVelocity(finalObj2V)
+
+
 def getCameraTrack(pos, lpos, lwidth , lheight):
 
     x, y = pos.x, pos.y
@@ -556,6 +556,12 @@ def getCameraTrack(pos, lpos, lwidth , lheight):
         difference = y + halfh - sheight
         newlpos[1] = lpos[1] + difference
     return [round(a) for a in newlpos]
+
+def colScan(objects):
+    for object in objects:
+        otherObjects = [x for x in objects if x != object]
+        collisionIndex = object.GetRect().collidelistall(otherObjects)
+        colliders = [otherObjects[x] for x in collisionIndex]
 
 
 objects = [PhysObject((100, 100), ball_image, 60, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
@@ -599,8 +605,16 @@ while True:
 
     colliders = world + objects # Everything the player can collide with
 
+    ## UPDATING ALL GAME OBJECTS ##
     player.Update(colliders, dt)
     player.Draw(screen)
+
+    newcolliders = [x for x in world]
+    newcolliders.append(player)
+    for object in objects:
+        object.Update(newcolliders + [x for x in objects if x != object], dt)
+        object.Draw(screen)
+    ###############################
 
     keys = pygame.key.get_pressed()
     if keys[pygame.K_RIGHT]:
@@ -648,11 +662,7 @@ while True:
             if event.key == pygame.K_h:
                 ball.RemoveForce(ball, "Drive")
 
-    newcolliders = [x for x in world]
-    newcolliders.append(player)
-    for object in objects:
-        object.Update(newcolliders + [x for x in objects if x != object], dt)
-        object.Draw(screen)
+
 
 
     pygame.display.update()
