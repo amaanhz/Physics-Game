@@ -103,8 +103,8 @@ class Vec2:
 
     def __sub__(self, n):
         if isinstance(n, Vec2):
-            return Vec2(self.x + n.x, self.y + n.y)
-        return Vec2(self.x + n, self.y + n)
+            return Vec2(self.x - n.x, self.y - n.y)
+        return Vec2(self.x - n, self.y - n)
     def __eq__(self, v2):
         return self.x == v2.x and self.y == v2.y
     def __mul__(self, n):
@@ -368,6 +368,7 @@ class PhysObject:
         self.momentum = Vec2(0, 0)
         self.ReactionXInfo = None
         self.ReactionYInfo = None
+        self.collided = False # stinky
 
     def Draw(self, surface):
         surface.blit(self.image, self.rect.topleft)
@@ -464,15 +465,15 @@ class PhysObject:
         hit_list = coltest(self.rect, colliders)
 
         for entity in hit_list:
-            if self.velocity.y > 0:
-                self.rect.bottom = entity.GetRect().top
-                self.pos = Vec2(self.rect.topleft)
-                collision_types["bottom"] = True
-
-            elif self.velocity.y < 0:
-                self.rect.top = entity.GetRect().bottom
-                self.pos = Vec2(self.rect.topleft)
-                collision_types["top"] = True
+            # if self.velocity.y > 0:
+            #     self.rect.bottom = entity.GetRect().top
+            #     self.pos = Vec2(self.rect.topleft)
+            #     collision_types["bottom"] = True
+            #
+            # elif self.velocity.y < 0:
+            #     self.rect.top = entity.GetRect().bottom
+            #     self.pos = Vec2(self.rect.topleft)
+            #     collision_types["top"] = True
 
             if isinstance(entity, WorldCollider):
                 if self.COR > 0:
@@ -518,29 +519,39 @@ class Player(PhysObject):
         super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT)
 
 class Collision:
-    def __init__(self, object, colliders):
+    def __init__(self, object, collider):
         self.object = object
-        self.colliders = colliders
+        self.collider = collider
     def Resolve(self):
         obj1 = self.object
-        for obj2 in self.colliders:
-            pTotal = obj1.momentum + obj2.momentum
-            finalObj1V = obj2.velocity - obj1.velocity # + finalObj2V
-            pTotal = pTotal - (finalObj1V * obj1.mass)
-            finalObj2V = pTotal / (obj1.mass + obj2.mass)
-            finalObj1V = finalObj1V + finalObj2V
-            obj1.SetVelocity(finalObj1V)
-            obj2.SetVelocity(finalObj2V)
+        obj2 = self.collider
+        pTotal = obj1.momentum + obj2.momentum
+        finalObj1V = obj2.velocity - obj1.velocity # + finalObj2V
+        pTotal = pTotal - (finalObj1V * obj1.mass)
+        finalObj2V = pTotal / (obj1.mass + obj2.mass)
+        finalObj1V = finalObj1V + finalObj2V
+        obj1.SetVelocityVec2(finalObj1V)
+        obj2.SetVelocityVec2(finalObj2V)
+        ## stinky
+        obj1.collided = True
+        obj2.collided = True
+        
 
 
 def getCameraTrack(pos, lpos, lwidth , lheight):
-
+    """
+    :param Vec2 pos: The position of the player
+    :param Vec2 lpos: The position of the level background
+    :param float lwidth: The width of the level
+    :param float lheight: The height of the level
+    :return:
+    """
     x, y = pos.x, pos.y
-    swidth, sheight = WINDOW_SIZE
+    swidth, sheight = WINDOW_SIZE # Screen width and height
     halfw, halfh = swidth / 2, sheight / 2
-    maxWidthOffset = lwidth - swidth
+    maxWidthOffset = lwidth - swidth # The maximum width and height the level can move before the image ends
     maxHeightOffset = lheight - sheight
-    newlpos = list(lpos)
+    newlpos = list(lpos) # New level position will be calculated and stored in a list
 
     if x + halfw > swidth and lpos[0] > -maxWidthOffset:
         difference = x + halfw - swidth
@@ -558,10 +569,15 @@ def getCameraTrack(pos, lpos, lwidth , lheight):
     return [round(a) for a in newlpos]
 
 def colScan(objects):
+    collisionRecord = {}
     for object in objects:
         otherObjects = [x for x in objects if x != object]
         collisionIndex = object.GetRect().collidelistall(otherObjects)
         colliders = [otherObjects[x] for x in collisionIndex]
+        collisions = [Collision(object, collider) for collider in colliders]
+        for collision in collisions:
+            if not collision.object.collided and not collision.collider.collided: # stinky
+                collision.Resolve()
 
 
 objects = [PhysObject((100, 100), ball_image, 60, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
@@ -575,6 +591,8 @@ prev_time = time.time()
 player.SetWeightless(False)
 
 ball = objects[0]
+player.SetWeightless(True)
+ball.SetWeightless(True)
 
 lPos = [0, 0]
 
@@ -586,6 +604,7 @@ while True:
 
     oldLPos = lPos
     lPos = getCameraTrack(player.GetPos(), lPos, background_image.get_size()[0], background_image.get_size()[1])
+
 
     # move game objects accordingly with the level
     diff = list(numpy.subtract(lPos, oldLPos)) # convert the numpy array to a regular list
@@ -605,6 +624,7 @@ while True:
 
     colliders = world + objects # Everything the player can collide with
 
+
     ## UPDATING ALL GAME OBJECTS ##
     player.Update(colliders, dt)
     player.Draw(screen)
@@ -615,6 +635,9 @@ while True:
         object.Update(newcolliders + [x for x in objects if x != object], dt)
         object.Draw(screen)
     ###############################
+    newcol = [x for x in objects]
+    newcol.append(player)
+    colScan(newcol)
 
     keys = pygame.key.get_pressed()
     if keys[pygame.K_RIGHT]:
