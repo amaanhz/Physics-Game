@@ -335,6 +335,8 @@ class WorldCollider:
     def __init__(self, rect, material="Asphalt"):
         self.rect = rect
         self.material = MATERIALS[material]
+    def DrawDebug(self):
+        pygame.draw.rect(screen, RED, self.rect, 1)
     def GetRect(self):
         return self.rect
     def GetPos(self):
@@ -368,7 +370,6 @@ class PhysObject:
         self.momentum = Vec2(0, 0)
         self.ReactionXInfo = None
         self.ReactionYInfo = None
-        self.collided = False # stinky
 
     def Draw(self, surface):
         surface.blit(self.image, self.rect.topleft)
@@ -522,6 +523,10 @@ class Collision:
     def __init__(self, object, collider):
         self.object = object
         self.collider = collider
+        self.resolved = False
+    def __eq__(self, other):
+        return self.object == other.object and self.collider == other.collider or \
+               self.object == other.collider and self.collider == other.object
     def Resolve(self):
         obj1 = self.object
         obj2 = self.collider
@@ -532,10 +537,32 @@ class Collision:
         finalObj1V = finalObj1V + finalObj2V
         obj1.SetVelocityVec2(finalObj1V)
         obj2.SetVelocityVec2(finalObj2V)
-        ## stinky
-        obj1.collided = True
-        obj2.collided = True
-        
+        self.resolved = True
+    def CheckOverlap(self):
+        return self.object.GetRect().colliderect(self.collider.GetRect())
+
+class CollisionHandler:
+    def __init__(self):
+        self.collisions = []
+    def ColScan(self, objects):
+        for object in objects:
+            otherObjects = [x for x in objects if x != object]  # All the other objects in the world
+            collisionIndex = object.GetRect().collidelistall(otherObjects)  # Get the indexes for every object we are colliding with
+            colliders = [otherObjects[x] for x in collisionIndex]  # Create a list of objects by their indexes
+            for collider in colliders:
+                collision = Collision(object, collider)
+                if collision not in self.collisions:
+                    self.collisions.append(collision)
+    def Update(self, objects):
+        self.ColScan(objects)
+        for i, collision in enumerate(self.collisions):
+            if not collision.resolved:
+                collision.Resolve()
+            if collision.CheckOverlap():
+                pass
+            else:
+                self.collisions.pop(i)
+
 
 
 def getCameraTrack(pos, lpos, lwidth , lheight):
@@ -568,19 +595,8 @@ def getCameraTrack(pos, lpos, lwidth , lheight):
         newlpos[1] = lpos[1] + difference
     return [round(a) for a in newlpos]
 
-def colScan(objects):
-    collisionRecord = {}
-    for object in objects:
-        otherObjects = [x for x in objects if x != object]
-        collisionIndex = object.GetRect().collidelistall(otherObjects)
-        colliders = [otherObjects[x] for x in collisionIndex]
-        collisions = [Collision(object, collider) for collider in colliders]
-        for collision in collisions:
-            if not collision.object.collided and not collision.collider.collided: # stinky
-                collision.Resolve()
 
-
-objects = [PhysObject((100, 100), ball_image, 60, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
+objects = [PhysObject((100, 100), ball_image, 160, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
 
 player = Player((50, 100), player_image, 50)
 
@@ -595,6 +611,8 @@ player.SetWeightless(True)
 ball.SetWeightless(True)
 
 lPos = [0, 0]
+
+colHandler = CollisionHandler()
 
 while True:
     clock.tick()
@@ -634,10 +652,14 @@ while True:
     for object in objects:
         object.Update(newcolliders + [x for x in objects if x != object], dt)
         object.Draw(screen)
+
+    if DEBUG:
+        for collider in world:
+            collider.DrawDebug()
     ###############################
     newcol = [x for x in objects]
     newcol.append(player)
-    colScan(newcol)
+    colHandler.Update(newcol)
 
     keys = pygame.key.get_pressed()
     if keys[pygame.K_RIGHT]:
