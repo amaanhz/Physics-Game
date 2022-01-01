@@ -7,7 +7,7 @@ pygame.init()
 
 pygame.display.set_caption("Physics")
 
-DEBUG = False
+DEBUG = True
 
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
@@ -27,21 +27,66 @@ PLAYER_ROTATION_SPEED = 1
 
 
 class Material:
-    def __init__(self, static, kinetic):
+    def __init__(self, static, kinetic, cor):
         self.static = static
         self.kinetic = kinetic
+        self.bounceModifier = cor
 
 MATERIALS = {
-    "Asphalt": Material(0.9, 0.65)
+    "Asphalt": Material(0.9, 0.65, 0.8)
 }
 
 screen = pygame.display.set_mode(WINDOW_SIZE, 0, 32)
 
 background_image = pygame.image.load("assets/background/backgroundbig.png").convert()
+LEVEL_SIZE = background_image.get_size()
+
 player_image = pygame.image.load("assets/sprites/character.png").convert_alpha()
 ball_image = pygame.image.load("assets/sprites/ball.png").convert_alpha()
 
 METRE = player_image.get_height() * (1 / 1.7)
+
+def trace(source, dir, target, detailed=False):
+    """
+    :param source: A source point or object
+    :param dir: Normalized vector representing direction of the ray
+    :type dir: Vec2
+    :param target: What to test for ray collision on
+    :param detailed: Detailed info about the hit
+    :return: Whether a hit was registered
+    """
+    if not isinstance(source, Vec2):
+        source = source.GetPos()
+    if not isinstance(target, pygame.Rect):
+        target = target.GetRect()
+    width, height = WINDOW_SIZE
+    xDir = int(identity(dir).x)
+    end_pos = (0, 0)
+    if xDir != 0:
+        gradient = dir.y / dir.x
+        bounds = [int(source.x), LEVEL_SIZE[0] if xDir == 1 else -LEVEL_SIZE[0]]
+        for x in range(bounds[0], bounds[1], xDir):
+            y = x * gradient + source.y
+
+            if DEBUG and x == bounds[1] - xDir:
+                end_pos = (x, int(y))
+                pygame.draw.aaline(screen, RED, (source.x, source.y), end_pos)
+
+            if target.collidepoint(x, y):
+                return True
+    else:
+        yDir = int(identity(dir).y)
+        bounds = [int(source.y), LEVEL_SIZE[1] if yDir == 1 else -LEVEL_SIZE[1]]
+        for y in range(bounds[0], bounds[1], yDir):
+
+            if DEBUG and y == bounds[1] - yDir:
+                end_pos = (source.x, y)
+                pygame.draw.aaline(screen, RED, (source.x, source.y), end_pos)
+
+            if target.collidepoint(source.x, y):
+                return True
+    return False
+
 
 def coltest(rect, colliders):
     hit_list = []
@@ -51,14 +96,21 @@ def coltest(rect, colliders):
     return hit_list
 
 def touching(obj1, obj2):
+    """
+    :param obj1: Object 1
+    :param obj2: Object 2
+    :return: The side of obj1 which obj2 is touching, or False.
+    """
     rect1, rect2 = obj1.GetRect(), obj2.GetRect()
-    if rect1.left == rect2.right:
+    checky = (rect2.top <= rect1.bottom and rect2.bottom >= rect1.top)
+    checkx = (rect2.left <= rect1.right and rect2.right >= rect1.left)
+    if rect1.left == rect2.right and checky:
         return "left"
-    if rect1.right == rect2.left:
+    if rect1.right == rect2.left and checkx:
         return "right"
-    if rect1.top == rect2.bottom:
+    if rect1.top == rect2.bottom and checky:
         return "top"
-    if rect1.bottom == rect2.top:
+    if rect1.bottom == rect2.top and checkx:
         return "bottom"
     return False
 
@@ -82,6 +134,8 @@ def touchingany(ent, colliders):
 
 def identity(n):
     """Returns the normalised version of the vector or number that is input. E.g: (-500, 0) becomes (-1,0)"""
+    if isinstance(n, Vec2):
+        return n.noErrorDiv(abs(n))
     if n != 0:
         return n / abs(n)
     else:
@@ -93,14 +147,14 @@ class Vec2:
             self.x, self.y = args[0]
         elif len(args) == 2:
             self.x, self.y = args[0], args[1]
-
+    def __abs__(self):
+        return Vec2(abs(self.x), abs(self.y))
     def __add__(self, n):
         if isinstance(n, Vec2):
             return Vec2(self.x + n.x, self.y + n.y)
         return Vec2(self.x + n, self.y + n)
     def __radd__(self, n):
         return self + n
-
     def __sub__(self, n):
         if isinstance(n, Vec2):
             return Vec2(self.x - n.x, self.y - n.y)
@@ -112,8 +166,12 @@ class Vec2:
             return Vec2(self.x * n.x, self.y * n.y)
         return Vec2(self.x * n, self.y * n)
     def __truediv__(self, n):
+        if isinstance(n, Vec2):
+            return Vec2(self.x / n.x, self.y / n.y)
         return Vec2(self.x / n, self.y / n)
     def __floordiv__(self, n):
+        if isinstance(n, Vec2):
+            return Vec2(self.x // n.x, self.y // n.y)
         return Vec2(self.x // n, self.y // n)
     def __pow__(self, pow):
         return Vec2(self.x ** pow, self.y ** pow)
@@ -142,6 +200,11 @@ class Vec2:
         return self / mag
     def Inverse(self):
         return self * -1
+    def noErrorDiv(self, n):
+        new = Vec2(0, 0)
+        new.x = self.x / n.x if n.x != 0 else 0
+        new.y = self.y / n.y if n.y != 0 else 0
+        return new
 
 
 dir = {"left" : Vec2(-1, 0),
@@ -368,8 +431,6 @@ class PhysObject:
         self.acceleration = Vec2(0, 0)
         self.velocity = Vec2(0, 0)
         self.momentum = Vec2(0, 0)
-        self.ReactionXInfo = None
-        self.ReactionYInfo = None
 
     def Draw(self, surface):
         surface.blit(self.image, self.rect.topleft)
@@ -381,6 +442,9 @@ class PhysObject:
 
     def GetPos(self):
         return self.pos
+
+    def GetCentre(self):
+        return self.GetRect().center
 
     def SetPos(self, p):
         self.pos = p
@@ -435,17 +499,17 @@ class PhysObject:
         hit_list = coltest(self.rect, colliders)
 
         for entity in hit_list:
-        #     if self.velocity.x > 0:
-        #         self.rect.right = entity.GetRect().left
-        #         self.pos = Vec2(self.rect.topleft)
-        #         collision_types["right"] = True
-        #
-        #     elif self.velocity.x < 0:
-        #         self.rect.left = entity.GetRect().right
-        #         self.pos = Vec2(self.rect.topleft)
-        #         collision_types["left"] = True
-
             if isinstance(entity, WorldCollider):
+                if self.velocity.x > 0:
+                    self.rect.right = entity.GetRect().left
+                    self.pos = Vec2(self.rect.topleft)
+                    collision_types["right"] = True
+
+                elif self.velocity.x < 0:
+                    self.rect.left = entity.GetRect().right
+                    self.pos = Vec2(self.rect.topleft)
+                    collision_types["left"] = True
+
                 if self.COR > 0:
                     bounce = abs(self.velocity.x) * self.COR
                     if bounce > 1:
@@ -466,17 +530,17 @@ class PhysObject:
         hit_list = coltest(self.rect, colliders)
 
         for entity in hit_list:
-            # if self.velocity.y > 0:
-            #     self.rect.bottom = entity.GetRect().top
-            #     self.pos = Vec2(self.rect.topleft)
-            #     collision_types["bottom"] = True
-            #
-            # elif self.velocity.y < 0:
-            #     self.rect.top = entity.GetRect().bottom
-            #     self.pos = Vec2(self.rect.topleft)
-            #     collision_types["top"] = True
-
             if isinstance(entity, WorldCollider):
+                if self.velocity.y > 0:
+                    self.rect.bottom = entity.GetRect().top
+                    self.pos = Vec2(self.rect.topleft)
+                    collision_types["bottom"] = True
+
+                elif self.velocity.y < 0:
+                    self.rect.top = entity.GetRect().bottom
+                    self.pos = Vec2(self.rect.topleft)
+                    collision_types["top"] = True
+
                 if self.COR > 0:
                     bounce = abs(self.velocity.y) * self.COR
                     if bounce > 1:
@@ -496,6 +560,9 @@ class PhysObject:
     def SetVelocityVec2(self, v2):
         self.velocity = v2
 
+    def GetVelocity(self):
+        return self.velocity
+
     def AddForce(self, source, name, force):
         if type(name) != str:
             raise TypeError("Name must be of type String")
@@ -503,6 +570,9 @@ class PhysObject:
 
     def RemoveForce(self, source, name):
         self.forces.RemoveForce(source, name)
+
+    def GetResultantForce(self):
+        return self.rForce
 
     def SetWeightless(self, state):
         self.weightless = state
@@ -524,9 +594,18 @@ class Collision:
         self.object = object
         self.collider = collider
         self.resolved = False
+        # self.worldCollision = isinstance(self.object, WorldCollider) or isinstance(self.collider, WorldCollider)
     def __eq__(self, other):
         return self.object == other.object and self.collider == other.collider or \
                self.object == other.collider and self.collider == other.object
+    @staticmethod
+    def pushing(obj1, obj2):
+        if obj1.GetResultantForce() != Vec2(0, 0) and obj1.GetVelocity() != Vec2(0, 0):
+            source = Vec2(obj1.GetCentre())
+            return trace(source, obj1.GetResultantForce().GetNormalized(), obj2) and \
+            trace(source, obj1.GetVelocity().GetNormalized(), obj2)
+        else:
+            return False
     def Resolve(self):
         obj1 = self.object
         obj2 = self.collider
@@ -539,39 +618,64 @@ class Collision:
         obj2.SetVelocityVec2(finalObj2V)
         self.resolved = True
     def CheckOverlap(self):
-        return self.object.GetRect().colliderect(self.collider.GetRect())
+        return self.object.GetRect().colliderect(self.collider.GetRect()) or touching(self.object, self.collider)
+    def ResolveOverlap(self):
+        obj1, obj2 = self.object, self.collider
+        if Collision.pushing(obj1, obj2):
+            obj2.AddForce(obj1, "Push", obj1.GetResultantForce())
+            obj1.AddForce(obj2, "Reaction", obj1.GetResultantForce())
+        else:
+            obj2.RemoveForce(obj1, "Push")
+            obj1.RemoveForce(obj2, "Reaction")
+        if Collision.pushing(obj2, obj1):
+            obj1.AddForce(obj2, "Push", obj2.GetResultantForce())
+            obj2.AddForce(obj1, "Reaction", obj2.GetResultantForce())
+        else:
+            obj1.RemoveForce(obj2, "Push")
+            obj2.RemoveForce(obj1, "Reaction")
+    def PreRemoval(self):
+        obj1, obj2 = self.object, self.collider
+        obj1.RemoveForce(obj2, "Push")
+        obj2.RemoveForce(obj1, "Reaction")
+        obj2.RemoveForce(obj1, "Push")
+        obj1.RemoveForce(obj2, "Reaction")
 
 class CollisionHandler:
     def __init__(self):
         self.collisions = []
-    def ColScan(self, objects):
-        for object in objects:
-            otherObjects = [x for x in objects if x != object]  # All the other objects in the world
+    def ColScan(self, world):
+        for entity in world:
+            otherObjects = [x for x in world if x != entity]  # All the other objects in the world
             collisionIndex = object.GetRect().collidelistall(otherObjects)  # Get the indexes for every object we are colliding with
             colliders = [otherObjects[x] for x in collisionIndex]  # Create a list of objects by their indexes
             for collider in colliders:
                 collision = Collision(object, collider)
                 if collision not in self.collisions:
                     self.collisions.append(collision)
-    def Update(self, objects):
-        self.ColScan(objects)
+    def Update(self, world):
+        self.ColScan(world)
         for i, collision in enumerate(self.collisions):
             if not collision.resolved:
                 collision.Resolve()
-            if collision.CheckOverlap():
-                pass
             else:
-                self.collisions.pop(i)
-
+                if collision.CheckOverlap():
+                   collision.ResolveOverlap()
+                if not collision.CheckOverlap():
+                    collision.PreRemoval()
+                    self.collisions.pop(i)
 
 
 def getCameraTrack(pos, lpos, lwidth , lheight):
     """
-    :param Vec2 pos: The position of the player
-    :param Vec2 lpos: The position of the level background
-    :param float lwidth: The width of the level
-    :param float lheight: The height of the level
-    :return:
+    :param pos: The position of the player
+    :type pos: Vec2
+    :param lpos: The position of the level background
+    :type lpos: Vec2
+    :param lwidth: The width of the level
+    :type lwidth: int
+    :param lheight: The height of the level
+    :type lheight: int
+    :return: The new level position required to move the "camera" accordingly with the player.
     """
     x, y = pos.x, pos.y
     swidth, sheight = WINDOW_SIZE # Screen width and height
@@ -604,9 +708,8 @@ world = [WorldCollider(pygame.Rect(0, 474, 1279, 720 - 474))]
 
 prev_time = time.time()
 
-player.SetWeightless(False)
-
 ball = objects[0]
+
 player.SetWeightless(True)
 ball.SetWeightless(True)
 
@@ -667,13 +770,13 @@ while True:
     if keys[pygame.K_LEFT]:
         player.Rotate(-1, colliders)
     if keys[pygame.K_SPACE]:
-        base = Vec2(0, 1000)
+        base = Vec2(0, 500)
         rads = player.angle * RAD
         base.x, base.y = (base.x * math.cos(rads)) - (base.y * math.sin(rads)),\
                  -((base.x * math.sin(rads)) + (base.y * math.cos(rads)))
         player.AddForce(player, "Drive", base)
     elif keys[pygame.K_LSHIFT]:
-        base = Vec2(0, 1000)
+        base = Vec2(0, 500)
         rads = player.angle * RAD
         base.x, base.y = -((base.x * math.cos(rads)) - (base.y * math.sin(rads))),\
                  (base.x * math.sin(rads)) + (base.y * math.cos(rads))
