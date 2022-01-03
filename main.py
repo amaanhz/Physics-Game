@@ -1,4 +1,4 @@
-import pygame, time, numpy, math, sys, copy
+import pygame, time, numpy, math, sys, copy, random
 
 clock = pygame.time.Clock()
 
@@ -14,16 +14,18 @@ RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
 
 WINDOW_SIZE = (1280, 720)
+swidth, sheight = WINDOW_SIZE
 FPS = 100
 
 RAD = math.pi / 180
 
+GRAVITYON = True
 GRAVITY = 15
 AIR_DENSITY = 1.2041
 PLAYER_DRAG_COEFFICIENT = 1.15
 SPHERE_DRAG_COEFFICIENT = 0.5
 PLAYER_ROTATION_SPEED = 1
-
+PLAYERFORCE = 1500
 
 
 class Material:
@@ -40,6 +42,7 @@ screen = pygame.display.set_mode(WINDOW_SIZE, 0, 32)
 
 background_image = pygame.image.load("assets/background/backgroundbig.png").convert()
 LEVEL_SIZE = background_image.get_size()
+lwidth, lheight = LEVEL_SIZE
 
 player_image = pygame.image.load("assets/sprites/character.png").convert_alpha()
 ball_image = pygame.image.load("assets/sprites/ball.png").convert_alpha()
@@ -301,8 +304,10 @@ class ForceManager:
 
 
         ## ADD WEIGHT FORCE IF IT DOESN'T EXIST ##
-        if not parent.weightless and not self.GetForce(parent, "Weight"):
+        if not parent.weightless and not self.GetForce(parent, "Weight") and GRAVITYON:
             self.AddForce(parent, "Weight", 0, parent.mass * GRAVITY)
+        if not GRAVITYON:
+            self.RemoveForce(parent, "Weight")
 
 
         ## ADD NORMAL FORCE IF THERE IS AN OPPOSING FORCE ##
@@ -418,12 +423,10 @@ class PhysObject:
         self.pos = Vec2(pos[0], pos[1])
         self.angle = 0
         self.angleDir = Vec2(-math.cos((90 - self.angle) * (math.pi / 180)), math.sin((90 - self.angle) * (math.pi / 180)))
-        self.image_clean = image
-        self.image = image
+        self.image_clean, self.image = image, image
         self.rect = pygame.Rect(pos[0], pos[1], self.image.get_width(), self.image.get_height())
         self.mass = mass
         self.Cd = Cd
-        self.circular = circular
         self.COR = COR
         self.weightless = False
         self.forces = ForceManager(self)
@@ -431,14 +434,16 @@ class PhysObject:
         self.acceleration = Vec2(0, 0)
         self.velocity = Vec2(0, 0)
         self.momentum = Vec2(0, 0)
+        self.circular = False
 
     def Draw(self, surface):
-        surface.blit(self.image, self.rect.topleft)
+        surface.blit(self.image, self.rect)
         if DEBUG:
             pygame.draw.rect(screen, RED, self.rect, 1)
             image_rect = self.image.get_rect()
             image_rect.center = self.rect.center
             pygame.draw.rect(screen, YELLOW, image_rect, 1)
+            pygame.draw.circle(screen, RED, self.rect.center, 1)
 
     def GetPos(self):
         return self.pos
@@ -454,12 +459,12 @@ class PhysObject:
 
     def Rotate(self, scale, colliders):
         if len(touchingany(self, colliders)) == 0:
+            old_rect = copy.deepcopy(self.rect)
             scale *= -1 # We want to interpret + rotation as clockwise
             self.angle += PLAYER_ROTATION_SPEED * scale
             rotated_image = pygame.transform.rotate(self.image_clean, self.angle)
             self.image = rotated_image
-            if not self.circular:
-                self.rect = self.image.get_rect(topleft=self.rect.topleft)
+            self.rect = self.image.get_rect(center=old_rect.center)
             self.angleDir.x, self.angleDir.y = -math.cos((90 - self.angle) * RAD), math.sin((90 - self.angle) * RAD)
 
     def Update(self, colliders, dt):
@@ -574,6 +579,9 @@ class PhysObject:
     def GetResultantForce(self):
         return self.rForce
 
+    def GetResultantNOF(self):
+        return self.forces.GetResultantNOF()
+
     def SetWeightless(self, state):
         self.weightless = state
 
@@ -588,6 +596,7 @@ class PhysObject:
 class Player(PhysObject):
     def __init__(self, pos, image, mass):
         super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT)
+
 
 class Collision:
     def __init__(self, object, collider):
@@ -622,14 +631,14 @@ class Collision:
     def ResolveOverlap(self):
         obj1, obj2 = self.object, self.collider
         if Collision.pushing(obj1, obj2):
-            obj2.AddForce(obj1, "Push", obj1.GetResultantForce())
-            obj1.AddForce(obj2, "Reaction", obj1.GetResultantForce())
+            obj2.AddForce(obj1, "Push", obj1.GetResultantNOF())
+            obj1.AddForce(obj2, "Reaction", obj1.GetResultantNOF())
         else:
             obj2.RemoveForce(obj1, "Push")
             obj1.RemoveForce(obj2, "Reaction")
         if Collision.pushing(obj2, obj1):
-            obj1.AddForce(obj2, "Push", obj2.GetResultantForce())
-            obj2.AddForce(obj1, "Reaction", obj2.GetResultantForce())
+            obj1.AddForce(obj2, "Push", obj2.GetResultantNOF())
+            obj2.AddForce(obj1, "Reaction", obj2.GetResultantNOF())
         else:
             obj1.RemoveForce(obj2, "Push")
             obj2.RemoveForce(obj1, "Reaction")
@@ -644,8 +653,8 @@ class CollisionHandler:
     def __init__(self):
         self.collisions = []
     def ColScan(self, world):
-        for entity in world:
-            otherObjects = [x for x in world if x != entity]  # All the other objects in the world
+        for object in world:
+            otherObjects = [x for x in world if x != object]  # All the other objects in the world
             collisionIndex = object.GetRect().collidelistall(otherObjects)  # Get the indexes for every object we are colliding with
             colliders = [otherObjects[x] for x in collisionIndex]  # Create a list of objects by their indexes
             for collider in colliders:
@@ -659,11 +668,58 @@ class CollisionHandler:
                 collision.Resolve()
             else:
                 if collision.CheckOverlap():
-                   collision.ResolveOverlap()
+                   #collision.ResolveOverlap()
+                    pass
                 if not collision.CheckOverlap():
                     collision.PreRemoval()
                     self.collisions.pop(i)
 
+def lINTerp(lb, ub, fraction):
+    return int(((ub - lb) * fraction) + lb)
+
+class Particle:
+    def __init__(self, pos, velocity, timer, weightless=False):
+        self.pos = pos
+        self.velocity = velocity
+        self.elapsed = 0
+        self.timer = timer
+        self.rect = pygame.Rect(self.pos - 1, self.pos - 1, 2, 2)
+    def Update(self, dt):
+        self.elapsed += dt
+        acceleration = Vec2(0, GRAVITY if GRAVITYON and not weightless else 0)
+        self.velocity += self.acceleration * dt
+        self.pos += velocity * dt
+        self.rect.topleft += velocity * dt
+
+class EngineParticle(Particle):
+    def __init__(self, pos, velocity, timer):
+        super.__init__(pos, velocity, timer)
+        self.colour = [255, 174, 0, 255]
+        self.radius = 2
+    def Update(self):
+        super.Update()
+        if self.elapsed < self.timer:
+            frac = self.elapsed / self.timer
+            self.colour[1] = lINTerp(174, 255, frac)
+            self.colour[2] = lINTerp(0, 255, frac)
+            self.colour[3] -= lINTerp(0, 255, frac)
+            self.radius = lINTerp(2, 25)
+    def Draw(self):
+        pygame.draw.circle(screen, self.colour, self.pos, self.radius)
+
+
+class ParticleHandler:
+    def __init__(self):
+        self.particles = []
+    def Update(self, dt):
+        for i, particle in enumerate(self.particles):
+            particle.Update(dt)
+            if particle.elapsed >= particle.timer:
+                self.particles.pop(i)
+        for particle in self.particles:
+            particle.Draw()
+    def Add(self, particle):
+        self.particles.append(particle)
 
 def getCameraTrack(pos, lpos, lwidth , lheight):
     """
@@ -700,22 +756,32 @@ def getCameraTrack(pos, lpos, lwidth , lheight):
     return [round(a) for a in newlpos]
 
 
-objects = [PhysObject((100, 100), ball_image, 160, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
+objects = [PhysObject((100, 100), ball_image, 150, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
 
-player = Player((50, 100), player_image, 50)
+for i in range(0, 5):
+    objects.append(PhysObject((random.randint(0, swidth - ball_image.get_width()), random.randint(0, sheight - ball_image.get_height())), ball_image, 150, SPHERE_DRAG_COEFFICIENT, True, 0.35))
+
+
+player = Player((50, 100), player_image, 100)
 
 world = [WorldCollider(pygame.Rect(0, 474, 1279, 720 - 474))]
+
+yTop = 0 - (lheight - sheight)
+world.append(WorldCollider(pygame.Rect(-1, yTop, 1, lheight)))
+world.append(WorldCollider(pygame.Rect(0, yTop - 1, lwidth, 1)))
+world.append(WorldCollider(pygame.Rect(lwidth, yTop, 1, lheight)))
 
 prev_time = time.time()
 
 ball = objects[0]
 
-player.SetWeightless(True)
-ball.SetWeightless(True)
+player.SetWeightless(False)
+ball.SetWeightless(False)
 
 lPos = [0, 0]
 
 colHandler = CollisionHandler()
+particleHandler = ParticleHandler()
 
 while True:
     clock.tick()
@@ -764,19 +830,27 @@ while True:
     newcol.append(player)
     colHandler.Update(newcol)
 
+    particleHandler.Update(dt)
+
     keys = pygame.key.get_pressed()
     if keys[pygame.K_RIGHT]:
         player.Rotate(1, colliders)
     if keys[pygame.K_LEFT]:
         player.Rotate(-1, colliders)
     if keys[pygame.K_SPACE]:
-        base = Vec2(0, 500)
+        base = Vec2(0, PLAYERFORCE)
         rads = player.angle * RAD
         base.x, base.y = (base.x * math.cos(rads)) - (base.y * math.sin(rads)),\
                  -((base.x * math.sin(rads)) + (base.y * math.cos(rads)))
         player.AddForce(player, "Drive", base)
+        recoil = base.Inverse()
+        #for i in range(0, 10):
+            #particleHandler.Add(EngineParticle())
+
+
+
     elif keys[pygame.K_LSHIFT]:
-        base = Vec2(0, 500)
+        base = Vec2(0, PLAYERFORCE)
         rads = player.angle * RAD
         base.x, base.y = -((base.x * math.cos(rads)) - (base.y * math.sin(rads))),\
                  (base.x * math.sin(rads)) + (base.y * math.cos(rads))
@@ -800,6 +874,9 @@ while True:
         if event.type == QUIT:
             pygame.quit()
             sys.exit()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_g:
+                GRAVITYON = False if GRAVITYON else True
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_SPACE:
                 player.RemoveForce(player, "Drive")
