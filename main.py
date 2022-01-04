@@ -424,7 +424,7 @@ class PhysObject:
         self.angle = 0
         self.angleDir = Vec2(-math.cos((90 - self.angle) * (math.pi / 180)), math.sin((90 - self.angle) * (math.pi / 180)))
         self.image_clean, self.image = image, image
-        self.rect = pygame.Rect(pos[0], pos[1], self.image.get_width(), self.image.get_height())
+        self.rect = self.image.get_rect(center=(pos[0], pos[1]))
         self.mass = mass
         self.Cd = Cd
         self.COR = COR
@@ -500,19 +500,19 @@ class PhysObject:
         ## HANDLE X MOVEMENT ##
         prevposx = self.pos.x
         self.pos.x += self.velocity.x * dt * METRE
-        self.rect.x = round(self.pos.x)
+        self.rect.centerx = round(self.pos.x)
         hit_list = coltest(self.rect, colliders)
 
         for entity in hit_list:
             if isinstance(entity, WorldCollider):
                 if self.velocity.x > 0:
                     self.rect.right = entity.GetRect().left
-                    self.pos = Vec2(self.rect.topleft)
+                    self.pos = Vec2(self.rect.center)
                     collision_types["right"] = True
 
                 elif self.velocity.x < 0:
                     self.rect.left = entity.GetRect().right
-                    self.pos = Vec2(self.rect.topleft)
+                    self.pos = Vec2(self.rect.center)
                     collision_types["left"] = True
 
                 if self.COR > 0:
@@ -531,19 +531,19 @@ class PhysObject:
         ## HANDLE Y MOVEMENT ##
         prevposy = self.pos.y
         self.pos.y += self.velocity.y * dt * METRE
-        self.rect.y = round(self.pos.y)
+        self.rect.centery = round(self.pos.y)
         hit_list = coltest(self.rect, colliders)
 
         for entity in hit_list:
             if isinstance(entity, WorldCollider):
                 if self.velocity.y > 0:
                     self.rect.bottom = entity.GetRect().top
-                    self.pos = Vec2(self.rect.topleft)
+                    self.pos = Vec2(self.rect.center)
                     collision_types["bottom"] = True
 
                 elif self.velocity.y < 0:
                     self.rect.top = entity.GetRect().bottom
-                    self.pos = Vec2(self.rect.topleft)
+                    self.pos = Vec2(self.rect.center)
                     collision_types["top"] = True
 
                 if self.COR > 0:
