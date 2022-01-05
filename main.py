@@ -14,6 +14,7 @@ RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
 
 WINDOW_SIZE = (1280, 720)
+WINDOW_CENTRE = (WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 2)
 swidth, sheight = WINDOW_SIZE
 FPS = 100
 
@@ -60,7 +61,7 @@ def trace(source, dir, target, detailed=False):
     """
     if not isinstance(source, Vec2):
         source = source.GetPos()
-    if not isinstance(target, pygame.Rect):
+    if not isinstance(target, pygame.Rect) and target is not None:
         target = target.GetRect()
     width, height = WINDOW_SIZE
     xDir = int(identity(dir).x)
@@ -74,9 +75,9 @@ def trace(source, dir, target, detailed=False):
             if DEBUG and x == bounds[1] - xDir:
                 end_pos = (x, int(y))
                 pygame.draw.aaline(screen, RED, (source.x, source.y), end_pos)
-
-            if target.collidepoint(x, y):
-                return True
+            if target is not None:
+                if target.collidepoint(x, y):
+                    return True
     else:
         yDir = int(identity(dir).y)
         bounds = [int(source.y), LEVEL_SIZE[1] if yDir == 1 else -LEVEL_SIZE[1]]
@@ -85,9 +86,9 @@ def trace(source, dir, target, detailed=False):
             if DEBUG and y == bounds[1] - yDir:
                 end_pos = (source.x, y)
                 pygame.draw.aaline(screen, RED, (source.x, source.y), end_pos)
-
-            if target.collidepoint(source.x, y):
-                return True
+            if target is not None:
+                if target.collidepoint(source.x, y):
+                    return True
     return False
 
 
@@ -182,6 +183,9 @@ class Vec2:
         return f"{str(self.x)}, {str(self.y)}"
     def __round__(self, n):
         return Vec2(round(self.x, n), round(self.y, n))
+    def __iter__(self):
+        yield self.x
+        yield self.y
     def Set(self, x, y):
         self.x, self.y = x, y
     def SetX(self, x):
@@ -393,7 +397,7 @@ class ForceManager:
         parent.acceleration = parent.rForce / parent.mass
 
         #########################################
-        if DEBUG:
+        if DEBUG and isinstance(self.parent, Player):
             for force in self.forces:
                 print(f"    {force.name}: {force} -- SOURCE: {force.source}")
 
@@ -422,7 +426,7 @@ class PhysObject:
     def __init__(self, pos, image, mass, Cd=0.5, circular=False, COR=0):
         self.pos = Vec2(pos[0], pos[1])
         self.angle = 0
-        self.angleDir = Vec2(-math.cos((90 - self.angle) * (math.pi / 180)), math.sin((90 - self.angle) * (math.pi / 180)))
+        self.angleDir = Vec2(math.cos((90 + self.angle) * RAD), -math.sin((90 - self.angle) * RAD)).GetNormalized()
         self.image_clean, self.image = image, image
         self.rect = self.image.get_rect(center=(pos[0], pos[1]))
         self.mass = mass
@@ -444,6 +448,9 @@ class PhysObject:
             image_rect.center = self.rect.center
             pygame.draw.rect(screen, YELLOW, image_rect, 1)
             pygame.draw.circle(screen, RED, self.rect.center, 1)
+            pygame.draw.circle(screen, RED, tuple(self.GetPos() - (self.GetAngleVec() * (self.image.get_height() / 2))), 1)
+            trace(self, self.GetAngleVec(), None)
+
 
     def GetPos(self):
         return self.pos
@@ -465,10 +472,10 @@ class PhysObject:
             rotated_image = pygame.transform.rotate(self.image_clean, self.angle)
             self.image = rotated_image
             self.rect = self.image.get_rect(center=old_rect.center)
-            self.angleDir.x, self.angleDir.y = -math.cos((90 - self.angle) * RAD), math.sin((90 - self.angle) * RAD)
+            self.angleDir = Vec2(math.cos((90 + self.angle) * RAD), -math.sin((90 - self.angle) * RAD)).GetNormalized()
 
     def Update(self, colliders, dt):
-        if DEBUG:
+        if DEBUG and isinstance(self, Player):
             print(type(self))
 
         self.forces.Update(colliders, dt)
@@ -482,7 +489,7 @@ class PhysObject:
         self.momentum = self.velocity * self.mass
 
         ##################################################
-        if DEBUG:
+        if DEBUG and isinstance(self, Player):
             print(f"Resultant Force: {str(self.rForce)}")
             print(f"Acceleration: {str(self.acceleration)}")
             print(f"Velocity: {str(self.velocity)}")
@@ -524,7 +531,7 @@ class PhysObject:
                 else:
                     self.velocity.x = 0
         #######################################
-        if DEBUG:
+        if DEBUG and isinstance(self, Player):
             print(f"Rect X: {self.rect.x}")
         #######################################
 
@@ -555,7 +562,7 @@ class PhysObject:
                 else:
                     self.velocity.y = 0
         #######################################
-        if DEBUG:
+        if DEBUG and isinstance(self, Player):
             print(f"Rect Y: {self.rect.y}")
         #######################################
 
@@ -683,29 +690,30 @@ class Particle:
         self.velocity = velocity
         self.elapsed = 0
         self.timer = timer
-        self.rect = pygame.Rect(self.pos - 1, self.pos - 1, 2, 2)
+        self.rect = pygame.Rect(self.pos.x - 1, self.pos.y - 1, 2, 2)
+        self.weightless = weightless
     def Update(self, dt):
         self.elapsed += dt
-        acceleration = Vec2(0, GRAVITY if GRAVITYON and not weightless else 0)
+        self.acceleration = Vec2(0, GRAVITY if GRAVITYON and not self.weightless else 0)
         self.velocity += self.acceleration * dt
-        self.pos += velocity * dt
-        self.rect.topleft += velocity * dt
+        self.pos += self.velocity * dt
+        self.rect.center = tuple(Vec2(self.rect.center) + (self.velocity * dt))
 
 class EngineParticle(Particle):
     def __init__(self, pos, velocity, timer):
-        super.__init__(pos, velocity, timer)
+        super().__init__(pos, velocity, timer)
         self.colour = [255, 174, 0, 255]
         self.radius = 2
-    def Update(self):
-        super.Update()
+    def Update(self, dt):
+        super().Update(dt)
         if self.elapsed < self.timer:
             frac = self.elapsed / self.timer
             self.colour[1] = lINTerp(174, 255, frac)
             self.colour[2] = lINTerp(0, 255, frac)
-            self.colour[3] -= lINTerp(0, 255, frac)
-            self.radius = lINTerp(2, 25)
+            self.colour[3] = lINTerp(0, 255, frac)
+            self.radius = lINTerp(2, 5, frac)
     def Draw(self):
-        pygame.draw.circle(screen, self.colour, self.pos, self.radius)
+        pygame.draw.circle(screen, self.colour, tuple(self.pos), self.radius)
 
 
 class ParticleHandler:
@@ -718,8 +726,13 @@ class ParticleHandler:
                 self.particles.pop(i)
         for particle in self.particles:
             particle.Draw()
-    def Add(self, particle):
+    def Add(self, particle, parent=None):
         self.particles.append(particle)
+    def CreateEngineParticles(self, ship):
+        width, height = ship.image.get_size()
+        enginePos = ship.GetPos() - (ship.GetAngleVec() * (height / 2))
+        for p in range(0, width):
+            pass
 
 def getCameraTrack(pos, lpos, lwidth , lheight):
     """
@@ -783,6 +796,8 @@ lPos = [0, 0]
 colHandler = CollisionHandler()
 particleHandler = ParticleHandler()
 
+
+
 while True:
     clock.tick()
     now = time.time()
@@ -811,6 +826,9 @@ while True:
 
     colliders = world + objects # Everything the player can collide with
 
+    for i in range(0, 10):
+        x, y = WINDOW_CENTRE
+        particleHandler.Add(EngineParticle(Vec2(random.randint(x - 4, x + 4), y), Vec2(random.randint(-15, 15), -random.randint(18, 22)), random.uniform(1,3)))
 
     ## UPDATING ALL GAME OBJECTS ##
     player.Update(colliders, dt)
@@ -844,8 +862,6 @@ while True:
                  -((base.x * math.sin(rads)) + (base.y * math.cos(rads)))
         player.AddForce(player, "Drive", base)
         recoil = base.Inverse()
-        #for i in range(0, 10):
-            #particleHandler.Add(EngineParticle())
 
 
 
