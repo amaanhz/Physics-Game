@@ -7,7 +7,7 @@ pygame.init()
 
 pygame.display.set_caption("Physics")
 
-DEBUG = True
+DEBUG = False
 
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
@@ -428,6 +428,8 @@ class PhysObject:
         self.angle = 0
         self.angleDir = Vec2(math.cos((90 + self.angle) * RAD), -math.sin((90 - self.angle) * RAD)).GetNormalized()
         self.image_clean, self.image = image, image
+        self.halfheight = self.image_clean.get_height() / 2
+        self.halfwidth = self.image_clean.get_width() / 2
         self.rect = self.image.get_rect(center=(pos[0], pos[1]))
         self.mass = mass
         self.Cd = Cd
@@ -449,9 +451,7 @@ class PhysObject:
             pygame.draw.rect(screen, YELLOW, image_rect, 1)
             pygame.draw.circle(screen, RED, self.rect.center, 1)
             #pygame.draw.circle(screen, RED, tuple(self.GetPos() - (self.GetAngleVec() * (Vec2(self.image.get_size()) / 2))), 1)
-            height = self.image_clean.get_height() / 2
-            engine = self.GetPos() + Vec2(height * math.sin(self.angle * RAD), height * math.cos(self.angle * RAD))
-            pygame.draw.circle(screen, RED, tuple(engine), 1)
+            pygame.draw.circle(screen, RED, tuple(self.engine), 1)
             trace(self, self.GetAngleVec(), None)
 
 
@@ -480,6 +480,9 @@ class PhysObject:
     def Update(self, colliders, dt):
         if DEBUG and isinstance(self, Player):
             print(type(self))
+
+        self.engine = self.GetPos() + Vec2(self.height * math.sin(self.angle * RAD), self.height * math.cos(self.angle * RAD))
+        self.
 
         self.forces.Update(colliders, dt)
         self.velocity += self.acceleration * dt
@@ -701,6 +704,10 @@ class Particle:
         self.velocity += self.acceleration * dt
         self.pos += self.velocity * dt
         self.rect.center = tuple(Vec2(self.rect.center) + (self.velocity * dt))
+    def SetPos(self, pos):
+        self.pos = pos
+    def GetPos(self):
+        return self.pos
 
 class EngineParticle(Particle):
     def __init__(self, pos, velocity, timer):
@@ -816,6 +823,8 @@ while True:
     player.SetPos(player.GetPos() + Vec2(diff)) # PhysObjects can be moved via vector addition
     for object in objects:
         object.SetPos(object.GetPos() + Vec2(diff))
+    for particle in particleHandler.particles:
+        particle.SetPos(particle.GetPos() + Vec2(diff))
     for wc in world: # Worldcolliders are tracked by rects only, so use numpy list subtraction
         wc.Move(diff)
 
@@ -828,10 +837,6 @@ while True:
     screen.blit(render_mousepos, (500, 0))
 
     colliders = world + objects # Everything the player can collide with
-
-    for i in range(0, 10):
-        x, y = WINDOW_CENTRE
-        particleHandler.Add(EngineParticle(Vec2(random.randint(x - 4, x + 4), y), Vec2(random.randint(-15, 15), -random.randint(18, 22)), random.uniform(1,3)))
 
     ## UPDATING ALL GAME OBJECTS ##
     player.Update(colliders, dt)
@@ -864,7 +869,13 @@ while True:
         base.x, base.y = (base.x * math.cos(rads)) - (base.y * math.sin(rads)),\
                  -((base.x * math.sin(rads)) + (base.y * math.cos(rads)))
         player.AddForce(player, "Drive", base)
-        recoil = base.Inverse()
+        recoil = base.Inverse().GetNormalized()
+        for i in range(0, 10):
+            x, y = tuple(player.engine)
+
+            particleHandler.Add(EngineParticle(Vec2(random.randint(x - 4, x + 4), y),
+                                               Vec2(random.randint(-15, 15), -random.randint(18, 22)),
+                                               random.uniform(1, 3)))
 
 
 
