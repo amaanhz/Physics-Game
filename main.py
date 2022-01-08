@@ -448,7 +448,10 @@ class PhysObject:
             image_rect.center = self.rect.center
             pygame.draw.rect(screen, YELLOW, image_rect, 1)
             pygame.draw.circle(screen, RED, self.rect.center, 1)
-            pygame.draw.circle(screen, RED, tuple(self.GetPos() - (self.GetAngleVec() * (self.image.get_height() / 2))), 1)
+            #pygame.draw.circle(screen, RED, tuple(self.GetPos() - (self.GetAngleVec() * (Vec2(self.image.get_size()) / 2))), 1)
+            height = self.image_clean.get_height() / 2
+            engine = self.GetPos() + Vec2(height * math.sin(self.angle * RAD), height * math.cos(self.angle * RAD))
+            pygame.draw.circle(screen, RED, tuple(engine), 1)
             trace(self, self.GetAngleVec(), None)
 
 
