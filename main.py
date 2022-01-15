@@ -26,7 +26,7 @@ AIR_DENSITY = 1.2041
 PLAYER_DRAG_COEFFICIENT = 1.15
 SPHERE_DRAG_COEFFICIENT = 0.5
 PLAYER_ROTATION_SPEED = 1
-PLAYERFORCE = 1500
+PLAYERFORCE = 2000
 
 
 class Material:
@@ -169,6 +169,8 @@ class Vec2:
         if isinstance(n, Vec2):
             return Vec2(self.x * n.x, self.y * n.y)
         return Vec2(self.x * n, self.y * n)
+    def __rmul__(self, n):
+        return self * n
     def __truediv__(self, n):
         if isinstance(n, Vec2):
             return Vec2(self.x / n.x, self.y / n.y)
@@ -204,14 +206,18 @@ class Vec2:
         return math.sqrt(self.x ** 2 + self.y ** 2)
     def GetNormalized(self):
         mag = self.GetMag()
-        return self / mag
+        return self.noErrorDiv(mag)
     def Inverse(self):
         return self * -1
     def noErrorDiv(self, n):
         new = Vec2(0, 0)
-        new.x = self.x / n.x if n.x != 0 else 0
-        new.y = self.y / n.y if n.y != 0 else 0
-        return new
+        if isinstance(n, Vec2):
+            new.x = self.x / n.x if n.x != 0 else 0
+            new.y = self.y / n.y if n.y != 0 else 0
+            return new
+        else:
+            new = self / n if n != 0 else 0
+            return new
 
 
 dir = {"left" : Vec2(-1, 0),
@@ -481,8 +487,7 @@ class PhysObject:
         if DEBUG and isinstance(self, Player):
             print(type(self))
 
-        self.engine = self.GetPos() + Vec2(self.height * math.sin(self.angle * RAD), self.height * math.cos(self.angle * RAD))
-        self.
+        self.engine = self.GetPos() + Vec2(self.halfheight * math.sin(self.angle * RAD), self.halfheight * math.cos(self.angle * RAD))
 
         self.forces.Update(colliders, dt)
         self.velocity += self.acceleration * dt
@@ -496,6 +501,7 @@ class PhysObject:
 
         ##################################################
         if DEBUG and isinstance(self, Player):
+            print(f"Pos: {str(self.pos)}")
             print(f"Resultant Force: {str(self.rForce)}")
             print(f"Acceleration: {str(self.acceleration)}")
             print(f"Velocity: {str(self.velocity)}")
@@ -620,14 +626,34 @@ class Collision:
     def __eq__(self, other):
         return self.object == other.object and self.collider == other.collider or \
                self.object == other.collider and self.collider == other.object
+
     @staticmethod
     def pushing(obj1, obj2):
+        """
+        :param obj1:
+        :type obj1: PhysObject
+        :param obj2:
+        :type obj2: PhysObject
+        :return: Whether object 1's resultant force and velocity direction is into object 2
+        """
         if obj1.GetResultantForce() != Vec2(0, 0) and obj1.GetVelocity() != Vec2(0, 0):
             source = Vec2(obj1.GetCentre())
             return trace(source, obj1.GetResultantForce().GetNormalized(), obj2) and \
             trace(source, obj1.GetVelocity().GetNormalized(), obj2)
         else:
             return False
+    # def seperate(self):
+    #     obj1, obj2 = self.object, self.collider
+    #     v1, v2 = obj1.GetVelocity(), obj2.GetVelocity()
+    #     v1Norm, v2Norm = v1.GetNormalized(), v2.GetNormalized()
+    #     v1Mag, v2Mag = v1.GetMag(), v2.GetMag()
+    #     totalVelocity = v1Mag + v2Mag
+    #     v1Perc, v2Perc = v1Mag / totalVelocity if totalVelocity != 0 else 0, v2Mag / totalVelocity if totalVelocity != 0 else 0
+    #     obj1Offset, obj2Offset = v1 * v1Perc, v2 * v2Perc
+    #     while self.object.GetRect().colliderect(self.collider.GetRect()):
+    #         obj1.SetPos(obj1.GetPos() + obj1Offset)
+    #         obj2.SetPos(obj2.GetPos() + obj2Offset)
+
     def Resolve(self):
         obj1 = self.object
         obj2 = self.collider
@@ -639,16 +665,21 @@ class Collision:
         obj1.SetVelocityVec2(finalObj1V)
         obj2.SetVelocityVec2(finalObj2V)
         self.resolved = True
+
+        self.seperate()
+
     def CheckOverlap(self):
         return self.object.GetRect().colliderect(self.collider.GetRect()) or touching(self.object, self.collider)
     def ResolveOverlap(self):
         obj1, obj2 = self.object, self.collider
+
         if Collision.pushing(obj1, obj2):
             obj2.AddForce(obj1, "Push", obj1.GetResultantNOF())
             obj1.AddForce(obj2, "Reaction", obj1.GetResultantNOF())
         else:
             obj2.RemoveForce(obj1, "Push")
             obj1.RemoveForce(obj2, "Reaction")
+
         if Collision.pushing(obj2, obj1):
             obj1.AddForce(obj2, "Push", obj2.GetResultantNOF())
             obj2.AddForce(obj1, "Reaction", obj2.GetResultantNOF())
@@ -681,8 +712,7 @@ class CollisionHandler:
                 collision.Resolve()
             else:
                 if collision.CheckOverlap():
-                   #collision.ResolveOverlap()
-                    pass
+                   collision.ResolveOverlap()
                 if not collision.CheckOverlap():
                     collision.PreRemoval()
                     self.collisions.pop(i)
@@ -724,7 +754,6 @@ class EngineParticle(Particle):
             self.radius = lINTerp(2, 5, frac)
     def Draw(self):
         pygame.draw.circle(screen, self.colour, tuple(self.pos), self.radius)
-
 
 class ParticleHandler:
     def __init__(self):
@@ -872,10 +901,8 @@ while True:
         recoil = base.Inverse().GetNormalized()
         for i in range(0, 10):
             x, y = tuple(player.engine)
-
-            particleHandler.Add(EngineParticle(Vec2(random.randint(x - 4, x + 4), y),
-                                               Vec2(random.randint(-15, 15), -random.randint(18, 22)),
-                                               random.uniform(1, 3)))
+            uv = recoil * 5 + random.randint(-6, 6)
+            particleHandler.Add(EngineParticle(player.engine, uv, random.uniform(0.5, 1.5)))
 
 
 
