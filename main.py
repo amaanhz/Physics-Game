@@ -483,7 +483,7 @@ class PhysObject:
             self.rect = self.image.get_rect(center=old_rect.center)
             self.angleDir = Vec2(math.cos((90 + self.angle) * RAD), -math.sin((90 - self.angle) * RAD)).GetNormalized()
 
-    def Update(self, colliders, dt):
+    def Update(self, colliders, colHandler, dt):
         if DEBUG and isinstance(self, Player):
             print(type(self))
 
@@ -523,17 +523,17 @@ class PhysObject:
         hit_list = coltest(self.rect, colliders)
 
         for entity in hit_list:
+            if self.velocity.x > 0:
+                self.rect.right = entity.GetRect().left
+                self.pos = Vec2(self.rect.center)
+                collision_types["right"] = True
+
+            elif self.velocity.x < 0:
+                self.rect.left = entity.GetRect().right
+                self.pos = Vec2(self.rect.center)
+                collision_types["left"] = True
+
             if isinstance(entity, WorldCollider):
-                if self.velocity.x > 0:
-                    self.rect.right = entity.GetRect().left
-                    self.pos = Vec2(self.rect.center)
-                    collision_types["right"] = True
-
-                elif self.velocity.x < 0:
-                    self.rect.left = entity.GetRect().right
-                    self.pos = Vec2(self.rect.center)
-                    collision_types["left"] = True
-
                 if self.COR > 0:
                     bounce = abs(self.velocity.x) * self.COR
                     if bounce > 1:
@@ -542,6 +542,8 @@ class PhysObject:
                         self.velocity.x = 0
                 else:
                     self.velocity.x = 0
+            else:
+                colHandler.AddCol(self, entity)
         #######################################
         if DEBUG and isinstance(self, Player):
             print(f"Rect X: {self.rect.x}")
@@ -554,17 +556,18 @@ class PhysObject:
         hit_list = coltest(self.rect, colliders)
 
         for entity in hit_list:
+            if self.velocity.y > 0:
+                self.rect.bottom = entity.GetRect().top
+                self.pos = Vec2(self.rect.center)
+                collision_types["bottom"] = True
+
+            elif self.velocity.y < 0:
+                self.rect.top = entity.GetRect().bottom
+                self.pos = Vec2(self.rect.center)
+                collision_types["top"] = True
+
+
             if isinstance(entity, WorldCollider):
-                if self.velocity.y > 0:
-                    self.rect.bottom = entity.GetRect().top
-                    self.pos = Vec2(self.rect.center)
-                    collision_types["bottom"] = True
-
-                elif self.velocity.y < 0:
-                    self.rect.top = entity.GetRect().bottom
-                    self.pos = Vec2(self.rect.center)
-                    collision_types["top"] = True
-
                 if self.COR > 0:
                     bounce = abs(self.velocity.y) * self.COR
                     if bounce > 1:
@@ -573,6 +576,8 @@ class PhysObject:
                         self.velocity.y = 0
                 else:
                     self.velocity.y = 0
+            else:
+                colHandler.AddCol(self, entity)
         #######################################
         if DEBUG and isinstance(self, Player):
             print(f"Rect Y: {self.rect.y}")
@@ -622,7 +627,6 @@ class Collision:
         self.object = object
         self.collider = collider
         self.resolved = False
-        # self.worldCollision = isinstance(self.object, WorldCollider) or isinstance(self.collider, WorldCollider)
     def __eq__(self, other):
         return self.object == other.object and self.collider == other.collider or \
                self.object == other.collider and self.collider == other.object
@@ -642,17 +646,7 @@ class Collision:
             trace(source, obj1.GetVelocity().GetNormalized(), obj2)
         else:
             return False
-    # def seperate(self):
-    #     obj1, obj2 = self.object, self.collider
-    #     v1, v2 = obj1.GetVelocity(), obj2.GetVelocity()
-    #     v1Norm, v2Norm = v1.GetNormalized(), v2.GetNormalized()
-    #     v1Mag, v2Mag = v1.GetMag(), v2.GetMag()
-    #     totalVelocity = v1Mag + v2Mag
-    #     v1Perc, v2Perc = v1Mag / totalVelocity if totalVelocity != 0 else 0, v2Mag / totalVelocity if totalVelocity != 0 else 0
-    #     obj1Offset, obj2Offset = v1 * v1Perc, v2 * v2Perc
-    #     while self.object.GetRect().colliderect(self.collider.GetRect()):
-    #         obj1.SetPos(obj1.GetPos() + obj1Offset)
-    #         obj2.SetPos(obj2.GetPos() + obj2Offset)
+
 
     def Resolve(self):
         obj1 = self.object
@@ -666,10 +660,9 @@ class Collision:
         obj2.SetVelocityVec2(finalObj2V)
         self.resolved = True
 
-        self.seperate()
-
     def CheckOverlap(self):
         return self.object.GetRect().colliderect(self.collider.GetRect()) or touching(self.object, self.collider)
+
     def ResolveOverlap(self):
         obj1, obj2 = self.object, self.collider
 
@@ -686,6 +679,7 @@ class Collision:
         else:
             obj1.RemoveForce(obj2, "Push")
             obj2.RemoveForce(obj1, "Reaction")
+
     def PreRemoval(self):
         obj1, obj2 = self.object, self.collider
         obj1.RemoveForce(obj2, "Push")
@@ -693,26 +687,32 @@ class Collision:
         obj2.RemoveForce(obj1, "Push")
         obj1.RemoveForce(obj2, "Reaction")
 
+
 class CollisionHandler:
     def __init__(self):
         self.collisions = []
+
     def ColScan(self, world):
         for object in world:
             otherObjects = [x for x in world if x != object]  # All the other objects in the world
             collisionIndex = object.GetRect().collidelistall(otherObjects)  # Get the indexes for every object we are colliding with
             colliders = [otherObjects[x] for x in collisionIndex]  # Create a list of objects by their indexes
             for collider in colliders:
-                collision = Collision(object, collider)
-                if collision not in self.collisions:
-                    self.collisions.append(collision)
+                self.AddCol(object, collider)
+
+    def AddCol(self, object, collider):
+        collision = Collision(object, collider)
+        if collision not in self.collisions:
+            self.collisions.append(collision)
+
     def Update(self, world):
-        self.ColScan(world)
+        #self.ColScan(world)
         for i, collision in enumerate(self.collisions):
             if not collision.resolved:
                 collision.Resolve()
             else:
-                if collision.CheckOverlap():
-                   collision.ResolveOverlap()
+                #if collision.CheckOverlap():
+                    #collision.seperate()
                 if not collision.CheckOverlap():
                     collision.PreRemoval()
                     self.collisions.pop(i)
@@ -868,13 +868,13 @@ while True:
     colliders = world + objects # Everything the player can collide with
 
     ## UPDATING ALL GAME OBJECTS ##
-    player.Update(colliders, dt)
+    player.Update(colliders, colHandler, dt)
     player.Draw(screen)
 
     newcolliders = [x for x in world]
     newcolliders.append(player)
     for object in objects:
-        object.Update(newcolliders + [x for x in objects if x != object], dt)
+        object.Update(newcolliders + [x for x in objects if x != object], colHandler, dt)
         object.Draw(screen)
 
     if DEBUG:
