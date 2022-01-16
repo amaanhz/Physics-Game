@@ -666,7 +666,7 @@ class Collision:
         obj2.SetVelocityVec2(finalObj2V)
         self.resolved = True
 
-        self.seperate()
+        #self.seperate()
 
     def CheckOverlap(self):
         return self.object.GetRect().colliderect(self.collider.GetRect()) or touching(self.object, self.collider)
