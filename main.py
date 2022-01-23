@@ -55,8 +55,11 @@ class MenuButton:
         self.buttonTextRect = self.buttonText.get_rect()
         self.buttonTextRect.center = self.buttonRect.center
     def Draw(self):
-        pygame.draw.rect(screen, GREY, self.buttonRect, 0, 7)
-        pygame.draw.rect(screen, BLACK, self.buttonRect, 4, 7)
+        if self.buttonRect.collidepoint(pygame.mouse.get_pos()):
+            pygame.draw.rect(screen, NEARLYBLACK, self.buttonRect, 0, 7)
+        else:
+            pygame.draw.rect(screen, GREY, self.buttonRect, 0, 7)
+        pygame.draw.rect(screen, BLACK, self.buttonRect, 3, 7)
         screen.blit(self.buttonText, self.buttonTextRect)
     def collide(self, mousePos):
         return self.buttonRect.collidepoint(mousePos)
@@ -97,6 +100,9 @@ class Menu:
 
                 world = [WorldCollider(pygame.Rect(0, 474, 1279, 720 - 474))]
                 self.state.newstate(Game(self.state, world, objects, player))
+            elif self.buttonList[2].collide(mousePos):
+                pygame.quit()
+                sys.exit()
 
         for event in pygame.event.get():
             if event.type == QUIT:
