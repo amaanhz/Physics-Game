@@ -3,41 +3,10 @@ import pygame, time, numpy, math, sys, copy, random
 clock = pygame.time.Clock()
 
 from pygame.locals import *
+from constants import *
 pygame.init()
 
 pygame.display.set_caption("Physics")
-
-DEBUG = False
-
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-YELLOW = (255, 255, 0)
-
-WINDOW_SIZE = (1280, 720)
-WINDOW_CENTRE = (WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 2)
-swidth, sheight = WINDOW_SIZE
-FPS = 100
-
-screen = pygame.display.set_mode(WINDOW_SIZE, 0, 32)
-
-background_image = pygame.image.load("assets/background/backgroundbig.png").convert()
-LEVEL_SIZE = background_image.get_size()
-lwidth, lheight = LEVEL_SIZE
-
-player_image = pygame.image.load("assets/sprites/character.png").convert_alpha()
-ball_image = pygame.image.load("assets/sprites/ball.png").convert_alpha()
-
-RAD = math.pi / 180
-
-GRAVITYON = True
-GRAVITY = 15
-AIR_DENSITY = 1.2041
-PLAYER_DRAG_COEFFICIENT = 1.15
-SPHERE_DRAG_COEFFICIENT = 0.5
-PLAYER_ROTATION_SPEED = 1
-PLAYERFORCE = 2000
-
-METRE = player_image.get_height() * (1 / 1.7)
 
 class Material:
     def __init__(self, static, kinetic, cor):
@@ -49,7 +18,7 @@ MATERIALS = {
     "Asphalt": Material(0.9, 0.65, 0.8)
 }
 
-def trace(source, dir, target, detailed=False):
+def trace(source, dir, target, LEVEL_SIZE, detailed=False):
     """
     :param source: A source point or object
     :param dir: Normalized vector representing direction of the ray
@@ -239,7 +208,6 @@ class ForceManager:
         self.forces = []
         self.parent = parent
         self.rForce = Vec2(0, 0)
-
     def GetForce(self, source, name):
         t = [x for x in self.forces if x.name == name and x.source == source] # Quick method of searching the list
         if len(t) > 1:
@@ -248,14 +216,12 @@ class ForceManager:
             return t[0]
         else:
             return None
-
     def GetAnyForce(self, name):
         t = [x for x in self.forces if x.name == name]
         if len(t) > 0:
             return t
         else:
             return None
-
     def AddForce(self, source, name, *args):
         vec = Vec2(0, 0)
         if len(args) == 2:
@@ -270,7 +236,6 @@ class ForceManager:
                 self.forces.append(Force(source, name, vec))
         else:
             self.RemoveForce(source, name)
-
     def RemoveForce(self, *args):
         if len(args) == 2:
             source, name = args
@@ -279,15 +244,12 @@ class ForceManager:
                     self.forces.pop(i)
         else:
             self.forces.pop(self.forces.index(args[0]))
-
     def GetResultantNOF(self):
         rForce = Vec2(0, 0)
         for force in self.forces:
             if "Friction" not in force.name and force.name != "Air Resistance":
                 rForce += force
         return rForce
-
-
     def Update(self, colliders, dt):
         parent = self.parent
         v = parent.velocity
@@ -315,7 +277,7 @@ class ForceManager:
         ## ADD WEIGHT FORCE IF IT DOESN'T EXIST ##
         if not parent.weightless and not self.GetForce(parent, "Weight") and GRAVITYON:
             self.AddForce(parent, "Weight", 0, parent.mass * GRAVITY)
-        if not GRAVITYON:
+        if not GRAVITYON or parent.weightless:
             self.RemoveForce(parent, "Weight")
 
 
@@ -446,7 +408,6 @@ class PhysObject:
         self.velocity = Vec2(0, 0)
         self.momentum = Vec2(0, 0)
         self.circular = False
-
     def Draw(self, surface):
         surface.blit(self.image, self.rect)
         if DEBUG:
@@ -457,21 +418,14 @@ class PhysObject:
             pygame.draw.circle(screen, RED, self.rect.center, 1)
             #pygame.draw.circle(screen, RED, tuple(self.GetPos() - (self.GetAngleVec() * (Vec2(self.image.get_size()) / 2))), 1)
             pygame.draw.circle(screen, RED, tuple(self.engine), 1)
-            trace(self, self.GetAngleVec(), None)
-
-
     def GetPos(self):
         return self.pos
-
     def GetCentre(self):
         return self.GetRect().center
-
     def SetPos(self, p):
         self.pos = p
-
     def GetRect(self):
         return self.rect
-
     def Rotate(self, scale, colliders):
         if len(touchingany(self, colliders)) == 0:
             old_rect = copy.deepcopy(self.rect)
@@ -481,7 +435,6 @@ class PhysObject:
             self.image = rotated_image
             self.rect = self.image.get_rect(center=old_rect.center)
             self.angleDir = Vec2(math.cos((90 + self.angle) * RAD), -math.sin((90 - self.angle) * RAD)).GetNormalized()
-
     def Update(self, colliders, dt):
         if DEBUG and isinstance(self, Player):
             print(type(self))
@@ -576,36 +529,26 @@ class PhysObject:
         if DEBUG and isinstance(self, Player):
             print(f"Rect Y: {self.rect.y}")
         #######################################
-
     def SetVelocity(self, vx, vy):
         self.velocity = Vec2(vx, vy)
-
     def SetVelocityVec2(self, v2):
         self.velocity = v2
-
     def GetVelocity(self):
         return self.velocity
-
     def AddForce(self, source, name, force):
         if type(name) != str:
             raise TypeError("Name must be of type String")
         self.forces.AddForce(source, name, force)
-
     def RemoveForce(self, source, name):
         self.forces.RemoveForce(source, name)
-
     def GetResultantForce(self):
         return self.rForce
-
     def GetResultantNOF(self):
         return self.forces.GetResultantNOF()
-
     def SetWeightless(self, state):
         self.weightless = state
-
     def GetAngleVec(self):
         return self.angleDir
-
     def PrintForces(self):
         for force in self.forces:
             print(f"{force}: {str(self.forces[force])}")
@@ -627,7 +570,7 @@ class Collision:
                self.object == other.collider and self.collider == other.object
 
     @staticmethod
-    def pushing(obj1, obj2):
+    def pushing(obj1, obj2, level_size):
         """
         :param obj1:
         :type obj1: PhysObject
@@ -637,8 +580,8 @@ class Collision:
         """
         if obj1.GetResultantForce() != Vec2(0, 0) and obj1.GetVelocity() != Vec2(0, 0):
             source = Vec2(obj1.GetCentre())
-            return trace(source, obj1.GetResultantForce().GetNormalized(), obj2) and \
-            trace(source, obj1.GetVelocity().GetNormalized(), obj2)
+            return trace(source, obj1.GetResultantForce().GetNormalized(), obj2, level_size) and \
+            trace(source, obj1.GetVelocity().GetNormalized(), obj2, level_size)
         else:
             return False
     # def seperate(self):
@@ -669,17 +612,17 @@ class Collision:
 
     def CheckOverlap(self):
         return self.object.GetRect().colliderect(self.collider.GetRect()) or touching(self.object, self.collider)
-    def ResolveOverlap(self):
+    def ResolveOverlap(self, level_size):
         obj1, obj2 = self.object, self.collider
 
-        if Collision.pushing(obj1, obj2):
+        if Collision.pushing(obj1, obj2, level_size):
             obj2.AddForce(obj1, "Push", obj1.GetResultantNOF())
             obj1.AddForce(obj2, "Reaction", obj1.GetResultantNOF())
         else:
             obj2.RemoveForce(obj1, "Push")
             obj1.RemoveForce(obj2, "Reaction")
 
-        if Collision.pushing(obj2, obj1):
+        if Collision.pushing(obj2, obj1, level_size):
             obj1.AddForce(obj2, "Push", obj2.GetResultantNOF())
             obj2.AddForce(obj1, "Reaction", obj2.GetResultantNOF())
         else:
@@ -693,8 +636,9 @@ class Collision:
         obj1.RemoveForce(obj2, "Reaction")
 
 class CollisionHandler:
-    def __init__(self):
+    def __init__(self, level_size):
         self.collisions = []
+        self.level_size = level_size
     def ColScan(self, world):
         for object in world:
             otherObjects = [x for x in world if x != object]  # All the other objects in the world
@@ -711,7 +655,7 @@ class CollisionHandler:
                 collision.Resolve()
             else:
                 if collision.CheckOverlap():
-                   collision.ResolveOverlap()
+                   collision.ResolveOverlap(self.level_size)
                 if not collision.CheckOverlap():
                     collision.PreRemoval()
                     self.collisions.pop(i)
@@ -772,179 +716,3 @@ class ParticleHandler:
         for p in range(0, width):
             pass
 
-def getCameraTrack(pos, lpos, lwidth , lheight):
-    """
-    :param pos: The position of the player
-    :type pos: Vec2
-    :param lpos: The position of the level background
-    :type lpos: Vec2
-    :param lwidth: The width of the level
-    :type lwidth: int
-    :param lheight: The height of the level
-    :type lheight: int
-    :return: The new level position required to move the "camera" accordingly with the player.
-    """
-    x, y = pos.x, pos.y
-    swidth, sheight = WINDOW_SIZE # Screen width and height
-    halfw, halfh = swidth / 2, sheight / 2
-    maxWidthOffset = lwidth - swidth # The maximum width and height the level can move before the image ends
-    maxHeightOffset = lheight - sheight
-    newlpos = list(lpos) # New level position will be calculated and stored in a list
-
-    if x + halfw > swidth and lpos[0] > -maxWidthOffset:
-        difference = x + halfw - swidth
-        newlpos[0] = lpos[0] - difference
-    elif x - halfw < 0 and lpos[0] < 0:
-        difference = abs(x - halfw)
-        newlpos[0] = lpos[0] + difference
-
-    if y - halfh < 0 and lpos[1] > -maxHeightOffset:
-        difference = y - halfh
-        newlpos[1] = lpos[1] + difference
-    elif y + halfh > sheight and lpos[1] < 0:
-        difference = y + halfh - sheight
-        newlpos[1] = lpos[1] + difference
-    return [round(a) for a in newlpos]
-
-
-# objects = [PhysObject((100, 100), ball_image, 150, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
-#
-# for i in range(0, 5):
-#     objects.append(PhysObject((random.randint(0, swidth - ball_image.get_width()), random.randint(0, sheight - ball_image.get_height())), ball_image, 150, SPHERE_DRAG_COEFFICIENT, True, 0.35))
-#
-#
-# player = Player((50, 100), player_image, 100)
-#
-# world = [WorldCollider(pygame.Rect(0, 474, 1279, 720 - 474))]
-#
-# yTop = 0 - (lheight - sheight)
-# world.append(WorldCollider(pygame.Rect(-1, yTop, 1, lheight)))
-# world.append(WorldCollider(pygame.Rect(0, yTop - 1, lwidth, 1)))
-# world.append(WorldCollider(pygame.Rect(lwidth, yTop, 1, lheight)))
-#
-# prev_time = time.time()
-#
-# ball = objects[0]
-#
-# player.SetWeightless(False)
-# ball.SetWeightless(False)
-#
-# lPos = [0, 0]
-#
-# colHandler = CollisionHandler()
-# particleHandler = ParticleHandler()
-#
-#
-#
-# while True:
-#     clock.tick()
-#     now = time.time()
-#     dt = now - prev_time
-#     prev_time = now
-#
-#     oldLPos = lPos
-#     lPos = getCameraTrack(player.GetPos(), lPos, background_image.get_size()[0], background_image.get_size()[1])
-#
-#
-#     # move game objects accordingly with the level
-#     diff = list(numpy.subtract(lPos, oldLPos)) # convert the numpy array to a regular list
-#     player.SetPos(player.GetPos() + Vec2(diff)) # PhysObjects can be moved via vector addition
-#     for object in objects:
-#         object.SetPos(object.GetPos() + Vec2(diff))
-#     for particle in particleHandler.particles:
-#         particle.SetPos(particle.GetPos() + Vec2(diff))
-#     for wc in world: # Worldcolliders are tracked by rects only, so use numpy list subtraction
-#         wc.Move(diff)
-#
-#     screen.blit(background_image, tuple(lPos))
-#
-#     font = pygame.font.Font(None, 30)
-#     render_fps = font.render(str(int(clock.get_fps())), True, WHITE)
-#     screen.blit(render_fps, (0, 0))
-#     render_mousepos = font.render(str(pygame.mouse.get_pos()), True, WHITE)
-#     screen.blit(render_mousepos, (500, 0))
-#
-#     colliders = world + objects # Everything the player can collide with
-#
-#     ## UPDATING ALL GAME OBJECTS ##
-#     player.Update(colliders, dt)
-#     player.Draw(screen)
-#
-#     newcolliders = [x for x in world]
-#     newcolliders.append(player)
-#     for object in objects:
-#         object.Update(newcolliders + [x for x in objects if x != object], dt)
-#         object.Draw(screen)
-#
-#     if DEBUG:
-#         for collider in world:
-#             collider.DrawDebug()
-#     ###############################
-#     newcol = [x for x in objects]
-#     newcol.append(player)
-#     colHandler.Update(newcol)
-#
-#     particleHandler.Update(dt)
-#
-#     keys = pygame.key.get_pressed()
-#     if keys[pygame.K_RIGHT]:
-#         player.Rotate(1, colliders)
-#     if keys[pygame.K_LEFT]:
-#         player.Rotate(-1, colliders)
-#     if keys[pygame.K_SPACE]:
-#         base = Vec2(0, PLAYERFORCE)
-#         rads = player.angle * RAD
-#         base.x, base.y = (base.x * math.cos(rads)) - (base.y * math.sin(rads)),\
-#                  -((base.x * math.sin(rads)) + (base.y * math.cos(rads)))
-#         player.AddForce(player, "Drive", base)
-#         recoil = base.Inverse().GetNormalized()
-#         for i in range(0, 10):
-#             x, y = tuple(player.engine)
-#             uv = recoil * 5 + random.randint(-6, 6)
-#             particleHandler.Add(EngineParticle(player.engine, uv, random.uniform(0.5, 1.5)))
-#
-#
-#
-#     elif keys[pygame.K_LSHIFT]:
-#         base = Vec2(0, PLAYERFORCE)
-#         rads = player.angle * RAD
-#         base.x, base.y = -((base.x * math.cos(rads)) - (base.y * math.sin(rads))),\
-#                  (base.x * math.sin(rads)) + (base.y * math.cos(rads))
-#         player.AddForce(player, "Drive", base)
-#
-#     if keys[pygame.K_d]:
-#         ball.Rotate(1, world + [x for x in objects if x != object])
-#     if keys[pygame.K_a]:
-#           ball.Rotate(-1, world + [x for x in objects if x != object])
-#     if keys[pygame.K_j]:
-#         ball.AddForce(ball, "Drive", Vec2(1000, 0))
-#     elif keys[pygame.K_h]:
-#         ball.AddForce(ball, "Drive", Vec2(-1000, 0))
-#
-#     if keys[pygame.K_MINUS]:
-#         lPos[0] = lPos[0] - 1
-#     elif keys[pygame.K_EQUALS]:
-#         lPos[0] = lPos[0] + 1
-#
-#     for event in pygame.event.get():
-#         if event.type == QUIT:
-#             pygame.quit()
-#             sys.exit()
-#         if event.type == pygame.KEYDOWN:
-#             if event.key == pygame.K_g:
-#                 GRAVITYON = False if GRAVITYON else True
-#         if event.type == pygame.KEYUP:
-#             if event.key == pygame.K_SPACE:
-#                 player.RemoveForce(player, "Drive")
-#             if event.key == pygame.K_LSHIFT:
-#                 player.RemoveForce(player, "Drive")
-#             if event.key == pygame.K_j:
-#                 ball.RemoveForce(ball, "Drive")
-#             if event.key == pygame.K_h:
-#                 ball.RemoveForce(ball, "Drive")
-#
-#
-#
-#
-#     pygame.display.update()
-#     clock.tick(FPS)
