@@ -1,11 +1,11 @@
 from physics import *
 from constants import *
-import os
+import os, csv
 
 largeBoldMenu = pygame.font.Font(FUTURE_LIGHT, 100)
 mediumMenu = pygame.font.Font(OPTIMUS, 28)
 
-def getCameraTrack(pos, lpos, lwidth , lheight):
+def getCameraTrack(pos, lpos, lwidth, lheight):
     """
     :param pos: The position of the player
     :type pos: Vec2
@@ -38,6 +38,31 @@ def getCameraTrack(pos, lpos, lwidth , lheight):
         difference = y + halfh - sheight
         newlpos[1] = lpos[1] + difference
     return [round(a) for a in newlpos]
+
+def level_load(level):
+    info = {
+        "background": os.path.join("levels", level, "background.png"),
+        "world": [],
+        "objects": [],
+        "player": None
+    }
+    with open(os.path.join("levels", level, "world.csv"), "r") as file:
+        reader = csv.reader(file)
+        for row in reader:
+            objInfo = list(map(int, row)) # Convert all coordinate values for the rect into integers
+            info["world"] = info["world"] + [WorldCollider(pygame.Rect(objInfo[0], objInfo[1], objInfo[2], objInfo[3]))]
+    with open(os.path.join("levels", level, "objects.csv"), "r") as file:
+        reader = csv.reader(file)
+        for i, row in enumerate(reader):
+            pos = tuple(map(int, row[0:2]))
+            if i == 0:
+                info["player"] = Player(pos, player_image, int(row[2]))
+            else:
+                physInfo = list(map(float, row[3:5])) + [bool(row[5])] + [float(row[6])]  # Convert all physInfo to floats and bool types
+                info["objects"] = info["objects"] + [PhysObject(pos, pygame.image.load(row[2]).convert_alpha(),
+                                                                physInfo[0], physInfo[1], physInfo[2], physInfo[3])]
+    return info
+
 
 class State:
     def __init__(self, newstate):
@@ -91,14 +116,8 @@ class Menu:
 
         if click:
             if self.buttonList[0].collide(mousePos):
-                objects = [PhysObject((100, 100), ball_image, 150, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
-                for i in range(0, 5):
-                    objects.append(PhysObject((random.randint(0, swidth - ball_image.get_width()),
-                                               random.randint(0, sheight - ball_image.get_height())), ball_image, 150,
-                                              SPHERE_DRAG_COEFFICIENT, True, 0.35))
-                player = Player((50, 100), player_image, 100)
-
-                world = [WorldCollider(pygame.Rect(0, 474, 1279, 720 - 474))]
+                gameData = level_load("test")
+                world, objects, player = gameData["world"], gameData["objects"], gameData["player"]
                 self.state.newstate(Game(self.state, world, objects, player))
             elif self.buttonList[2].collide(mousePos):
                 pygame.quit()
@@ -202,9 +221,9 @@ class Game:
             player.AddForce(player, "Drive", base)
 
         if keys[pygame.K_MINUS]:
-            lPos[0] = lPos[0] - 1
+            self.lPos[0] = self.lPos[0] - 1
         elif keys[pygame.K_EQUALS]:
-            lPos[0] = lPos[0] + 1
+            self.lPos[0] = self.lPos[0] + 1
 
         for event in pygame.event.get():
             if event.type == QUIT:
