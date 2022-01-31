@@ -716,3 +716,25 @@ class ParticleHandler:
         for p in range(0, width):
             pass
 
+class Objective:
+    def __init__(self, pos, width, height, trigger):
+        self.pos = pos
+        self.rect = pygame.Rect(pos[0], pos[1], width, height)
+        self.colour = GREY
+        self.trigger = trigger
+    def Update(self):
+        if self.trigger.getRect().colliderect(self.rect):
+            return True
+        return False
+    def Draw(self, screen):
+        pygame.draw.rect(screen, self.colour, self.rect)
+
+class PlayerObjective(Objective):
+    def __init__(self, pos, width, height, player):
+        super.__init__(pos, width, height, player)
+        self.colour = GREEN
+
+class PhysObjective(Objective):
+    def __init__(self, pos, width, height, obj):
+        super.__init__(pos, width, height, obj)
+        self.colour = GREEN

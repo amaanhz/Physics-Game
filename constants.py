@@ -4,6 +4,7 @@ DEBUG = False
 
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
+GREEN = (28, 214, 59)
 YELLOW = (255, 255, 0)
 BLACK = (0, 0, 0)
 ORANGE = (247, 160, 20)
