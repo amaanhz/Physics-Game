@@ -44,6 +44,7 @@ def level_load(level):
         "background": os.path.join("levels", level, "background.png"),
         "world": [],
         "objects": [],
+        "objectives": [],
         "player": None
     }
     with open(os.path.join("levels", level, "world.csv"), "r") as file:
@@ -61,6 +62,11 @@ def level_load(level):
                 physInfo = list(map(float, row[3:5])) + [bool(row[5])] + [float(row[6])]  # Convert all physInfo to floats and bool types
                 info["objects"] = info["objects"] + [PhysObject(pos, pygame.image.load(row[2]).convert_alpha(),
                                                                 physInfo[0], physInfo[1], physInfo[2], physInfo[3])]
+    with open(os.path.join("levels", level, "objectives.csv"), "r") as file:
+        reader = csv.reader(file)
+        for i, row in reader:
+            objInfo = list(map(int, row))
+            info["objectives"] = info["objectives"] + [PlayerObjective(Vec2(objInfo[0], objInfo[1]), objInfo[2], objInfo[3])]
     return info
 
 
@@ -117,8 +123,8 @@ class Menu:
         if click:
             if self.buttonList[0].collide(mousePos):
                 gameData = level_load("test")
-                world, objects, player = gameData["world"], gameData["objects"], gameData["player"]
-                self.state.newstate(Game(self.state, world, objects, player))
+                world, objects, objectives, player = gameData["world"], gameData["objects"], gameData["objectives"], gameData["player"]
+                self.state.newstate(Game(self.state, world, objects, player, objectives))
             elif self.buttonList[2].collide(mousePos):
                 pygame.quit()
                 sys.exit()
@@ -129,7 +135,7 @@ class Menu:
                 sys.exit()
 
 class Game:
-    def __init__(self, stateobj, world, objects, player):
+    def __init__(self, stateobj, world, objects, player, objectives):
         self.state = stateobj
         self.background_image = pygame.image.load("assets/background/backgroundbig.png").convert()
         self.level_size = self.background_image.get_size()
@@ -144,13 +150,16 @@ class Game:
 
         self.objects = objects
         self.player = player
+        self.objectives = objectives
 
         self.colHandler = CollisionHandler(self.level_size)
         self.particleHandler = ParticleHandler()
     def RunFrame(self, dt):
-        background_image, world, objects, player, colHandler, particleHandler = self.background_image, self.world, \
+        background_image, world, objects, player, colHandler, particleHandler, objectives = self.background_image, \
+                                                                                self.world, \
                                                                                 self.objects, self.player, \
-                                                                                self.colHandler, self.particleHandler
+                                                                                self.colHandler, self.particleHandler, \
+                                                                                self.objectives
 
         oldLPos = self.lPos
         self.lPos = getCameraTrack(player.GetPos(), self.lPos, background_image.get_size()[0], background_image.get_size()[1])
@@ -160,6 +169,8 @@ class Game:
         player.SetPos(self.player.GetPos() + Vec2(diff))  # PhysObjects can be moved via vector addition
         for object in objects:
             object.SetPos(object.GetPos() + Vec2(diff))
+        for objective in objectives:
+            objective.SetPos(objective.GetPos() + Vec2(diff))
         for particle in particleHandler.particles:
             particle.SetPos(particle.GetPos() + Vec2(diff))
         for wc in world:  # Worldcolliders are tracked by rects only, so use numpy list subtraction
@@ -178,6 +189,11 @@ class Game:
         ## UPDATING ALL GAME OBJECTS ##
         player.Update(colliders, dt)
         player.Draw(screen)
+
+        for objective in objectives:
+            objective.Update()
+            objective.Draw(screen)
+
 
         newcolliders = [x for x in world]
         newcolliders.append(player)

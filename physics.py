@@ -719,19 +719,25 @@ class ParticleHandler:
 class Objective:
     def __init__(self, pos, width, height, trigger):
         self.pos = pos
-        self.rect = pygame.Rect(pos[0], pos[1], width, height)
+        self.rect = pygame.Rect(pos.x, pos.y, width, height)
         self.colour = GREY
         self.trigger = trigger
+        self.complete = False
     def Update(self):
-        if self.trigger.getRect().colliderect(self.rect):
+        if self.trigger.GetRect().colliderect(self.rect):
             return True
         return False
     def Draw(self, screen):
         pygame.draw.rect(screen, self.colour, self.rect)
+    def SetPos(self, pos):
+        self.pos = pos
+        self.rect.topleft = tuple(self.pos)
+    def GetPos(self):
+        return self.pos
 
 class PlayerObjective(Objective):
     def __init__(self, pos, width, height, player):
-        super.__init__(pos, width, height, player)
+        super().__init__(pos, width, height, player)
         self.colour = GREEN
 
 class PhysObjective(Objective):
