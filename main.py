@@ -57,7 +57,7 @@ def level_load(level):
         for i, row in enumerate(reader):
             pos = tuple(map(int, row[0:2]))
             if i == 0:
-                info["player"] = Player(pos, player_image, int(row[2]))
+                info["player"] = Player(pos, player_image, int(row[2]), int(row[3]))
             else:
                 physInfo = list(map(float, row[3:5])) + [bool(row[5])] + [float(row[6])]  # Convert all physInfo to floats and bool types
                 info["objects"] = info["objects"] + [PhysObject(pos, pygame.image.load(row[2]).convert_alpha(),
@@ -218,16 +218,7 @@ class Game:
         if keys[pygame.K_LEFT]:
             player.Rotate(-1, colliders)
         if keys[pygame.K_SPACE]:
-            base = Vec2(0, PLAYERFORCE)
-            rads = player.angle * RAD
-            base.x, base.y = (base.x * math.cos(rads)) - (base.y * math.sin(rads)), \
-                             -((base.x * math.sin(rads)) + (base.y * math.cos(rads)))
-            player.AddForce(player, "Drive", base)
-            recoil = base.Inverse().GetNormalized()
-            for i in range(0, 10):
-                x, y = tuple(player.engine)
-                uv = recoil * 5 + random.randint(-6, 6)
-                particleHandler.Add(EngineParticle(player.engine, uv, random.uniform(0.5, 1.5)))
+            player.Thrust(particleHandler)
 
         elif keys[pygame.K_LSHIFT]:
             base = Vec2(0, PLAYERFORCE)
@@ -254,10 +245,6 @@ class Game:
                     player.RemoveForce(player, "Drive")
                 if event.key == pygame.K_LSHIFT:
                     player.RemoveForce(player, "Drive")
-                if event.key == pygame.K_j:
-                    ball.RemoveForce(ball, "Drive")
-                if event.key == pygame.K_h:
-                    ball.RemoveForce(ball, "Drive")
 
 
 state = State(None)

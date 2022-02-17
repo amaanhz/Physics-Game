@@ -1,6 +1,6 @@
 import pygame, math, os
 
-DEBUG = False
+DEBUG = True
 
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
@@ -35,6 +35,6 @@ AIR_DENSITY = 1.2041
 PLAYER_DRAG_COEFFICIENT = 1.15
 SPHERE_DRAG_COEFFICIENT = 0.5
 PLAYER_ROTATION_SPEED = 1
-PLAYERFORCE = 2000
+PLAYERFORCE = 3000
 
 METRE = player_image.get_height() * (1 / 1.7)

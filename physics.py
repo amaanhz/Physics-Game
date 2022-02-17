@@ -275,7 +275,7 @@ class ForceManager:
 
 
         ## ADD WEIGHT FORCE IF IT DOESN'T EXIST ##
-        if not parent.weightless and not self.GetForce(parent, "Weight") and GRAVITYON:
+        if not parent.weightless and GRAVITYON:
             self.AddForce(parent, "Weight", 0, parent.mass * GRAVITY)
         if not GRAVITYON or parent.weightless:
             self.RemoveForce(parent, "Weight")
@@ -555,8 +555,25 @@ class PhysObject:
         print(f"Resultant force: {self.rForce}")
 
 class Player(PhysObject):
-    def __init__(self, pos, image, mass):
+    def __init__(self, pos, image, mass, fuel):
         super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT)
+        self.fuel = fuel
+        self.bodymass = mass
+        self.mass = self.bodymass + self.fuel
+    def Update(self, colliders, dt):
+        self.mass = self.bodymass + self.fuel
+        super().Update(colliders, dt)
+        if self.fuel <= 1:
+            self.RemoveForce(self, "Drive")
+    def Thrust(self, particleHandler):
+        if self.fuel >= 1:
+            base = Vec2(0, PLAYERFORCE)
+            rads = self.angle * RAD
+            base.x, base.y = (base.x * math.cos(rads)) - (base.y * math.sin(rads)), \
+                             -((base.x * math.sin(rads)) + (base.y * math.cos(rads)))
+            self.AddForce(self, "Drive", base)
+            particleHandler.CreateEngineParticles(self, base)
+            self.fuel -= 1
 
 
 class Collision:
@@ -710,11 +727,11 @@ class ParticleHandler:
             particle.Draw()
     def Add(self, particle, parent=None):
         self.particles.append(particle)
-    def CreateEngineParticles(self, ship):
-        width, height = ship.image.get_size()
-        enginePos = ship.GetPos() - (ship.GetAngleVec() * (height / 2))
-        for p in range(0, width):
-            pass
+    def CreateEngineParticles(self, ship, drive):
+        for i in range(0, 10):
+            x, y = tuple(ship.engine)
+            uv = drive.Inverse().GetNormalized() * 100 + random.randint(-6, 6)
+            self.Add(EngineParticle(ship.engine, uv, random.uniform(0.5, 1.5)))
 
 class Objective:
     def __init__(self, pos, width, height, trigger):
