@@ -555,22 +555,28 @@ class PhysObject:
         print(f"Resultant force: {self.rForce}")
 
 class Player(PhysObject):
-    def __init__(self, pos, image, mass, fuel):
+    def __init__(self, pos, image, mass, fuel, thrust, weightlessfuel=False):
         super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT)
-        self.fuel = fuel
+        self.fuel, self.tank = fuel, fuel
+        self.weightlessfuel = weightlessfuel
         self.bodymass = mass
-        self.mass = self.bodymass + self.fuel
+        self.mass = self.bodymass + self.fuel if not weightlessfuel else self.bodymass
+        self.thrust = thrust
     def Update(self, colliders, dt):
-        self.mass = self.bodymass + self.fuel
+        if not self.weightlessfuel:
+            self.mass = self.bodymass + self.fuel
         super().Update(colliders, dt)
         if self.fuel <= 1:
             self.RemoveForce(self, "Drive")
-    def Thrust(self, particleHandler):
+    def Thrust(self, particleHandler, reverse=False):
         if self.fuel >= 1:
-            base = Vec2(0, PLAYERFORCE)
+            base = Vec2(0, self.thrust)
             rads = self.angle * RAD
             base.x, base.y = (base.x * math.cos(rads)) - (base.y * math.sin(rads)), \
                              -((base.x * math.sin(rads)) + (base.y * math.cos(rads)))
+            if reverse:
+                base.x *= -1
+                base.y *= -1
             self.AddForce(self, "Drive", base)
             particleHandler.CreateEngineParticles(self, base)
             self.fuel -= 1
@@ -678,7 +684,11 @@ class CollisionHandler:
                     self.collisions.pop(i)
 
 def lINTerp(lb, ub, fraction):
-    return int(((ub - lb) * fraction) + lb)
+    interval = (abs(ub - lb) * fraction)
+    if lb < ub:
+        return int(lb + interval)
+    else:
+        return int(lb - interval)
 
 class Particle:
     def __init__(self, pos, velocity, timer, weightless=False):

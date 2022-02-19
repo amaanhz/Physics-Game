@@ -56,12 +56,14 @@ def level_load(level):
         reader = csv.reader(file)
         for i, row in enumerate(reader):
             pos = tuple(map(int, row[0:2]))
-            if i == 0:
-                info["player"] = Player(pos, player_image, int(row[2]), int(row[3]))
-            else:
-                physInfo = list(map(float, row[3:5])) + [bool(row[5])] + [float(row[6])]  # Convert all physInfo to floats and bool types
-                info["objects"] = info["objects"] + [PhysObject(pos, pygame.image.load(row[2]).convert_alpha(),
+            physInfo = list(map(float, row[3:5])) + [bool(row[5])] + [float(row[6])]  # Convert all physInfo to floats and bool types
+            info["objects"] = info["objects"] + [PhysObject(pos, pygame.image.load(row[2]).convert_alpha(),
                                                                 physInfo[0], physInfo[1], physInfo[2], physInfo[3])]
+    with open(os.path.join("levels", level, "player.csv"), "r") as file:
+        reader = csv.reader(file)
+        for row in reader:
+            pos = tuple(map(int, row[0:2]))
+            info["player"] = Player(pos, player_image, float(row[2]), float(row[3]), float(row[4]),bool(row[5]))
     with open(os.path.join("levels", level, "objectives.csv"), "r") as file:
         reader = csv.reader(file)
         for i, row in reader:
@@ -154,6 +156,19 @@ class Game:
 
         self.colHandler = CollisionHandler(self.level_size)
         self.particleHandler = ParticleHandler()
+    def DrawHUD(self):
+        font = pygame.font.Font(None, 30)
+        render_fps = font.render(str(int(clock.get_fps())), True, WHITE)
+        screen.blit(render_fps, (0, 0))
+        render_mousepos = font.render(str(pygame.mouse.get_pos()), True, WHITE)
+        screen.blit(render_mousepos, (500, 0))
+        fuelBackgroundRect = pygame.Rect(0, 0, int(0.75 * swidth), int(0.03 * sheight))
+        fuelRect = pygame.Rect(0, 0, int(0.75 * swidth * self.player.fuel / self.player.tank), int(0.03 * sheight))
+
+        fuelBackgroundRect.center, fuelRect.center = (swidth // 2, int(0.95 * sheight)), (swidth // 2, int(0.95 * sheight))
+        pygame.draw.rect(screen, NEARLYBLACK, fuelBackgroundRect)
+        pygame.draw.rect(screen, (255, lINTerp(0, 200, self.player.fuel / self.player.tank), 0), fuelRect)
+
     def RunFrame(self, dt):
         background_image, world, objects, player, colHandler, particleHandler, objectives = self.background_image, \
                                                                                 self.world, \
@@ -178,11 +193,7 @@ class Game:
 
         screen.blit(background_image, tuple(self.lPos))
 
-        font = pygame.font.Font(None, 30)
-        render_fps = font.render(str(int(clock.get_fps())), True, WHITE)
-        screen.blit(render_fps, (0, 0))
-        render_mousepos = font.render(str(pygame.mouse.get_pos()), True, WHITE)
-        screen.blit(render_mousepos, (500, 0))
+        self.DrawHUD()
 
         colliders = world + objects  # Everything the player can collide with
 
@@ -221,11 +232,7 @@ class Game:
             player.Thrust(particleHandler)
 
         elif keys[pygame.K_LSHIFT]:
-            base = Vec2(0, PLAYERFORCE)
-            rads = player.angle * RAD
-            base.x, base.y = -((base.x * math.cos(rads)) - (base.y * math.sin(rads))), \
-                             (base.x * math.sin(rads)) + (base.y * math.cos(rads))
-            player.AddForce(player, "Drive", base)
+            player.Thrust(particleHandler, True)
 
         if keys[pygame.K_MINUS]:
             self.lPos[0] = self.lPos[0] - 1
