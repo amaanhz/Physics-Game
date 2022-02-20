@@ -113,6 +113,8 @@ def identity(n):
     else:
         return n
 
+
+
 class Vec2:
     def __init__(self, *args):
         if len(args) == 1 and (isinstance(args[0], tuple) or isinstance(args[0], list)):
@@ -156,6 +158,8 @@ class Vec2:
     def __iter__(self):
         yield self.x
         yield self.y
+    def Integer(self):
+        return Vec2(int(self.x), int(self.y))
     def Set(self, x, y):
         self.x, self.y = x, y
     def SetX(self, x):
@@ -306,7 +310,16 @@ class ForceManager:
             ent, side = result
             if isinstance(ent, WorldCollider):
                 if self.GetForce(ent, "ReactionY") or self.GetForce(ent, "ReactionX"):
-                    N = abs(self.GetForce(ent, "ReactionY").y) if side == "top" or side == "bottom" else abs(self.GetForce(ent, "ReactionX").x)
+                    N = 0
+                    if side == "top" or side == "bottom":
+                        force = self.GetForce(ent, "ReactionY")
+                        if force is not None:
+                            N = abs(force.y)
+                    else:
+                        force = self.GetForce(ent, "ReactionX")
+                        if force is not None:
+                            N = abs(force.x)
+
                     threshold = ent.GetMuStatic() * N
                     kinetic = ent.GetMuKinetic()
 
@@ -390,7 +403,7 @@ class WorldCollider:
         return self.material.kinetic
 
 class PhysObject:
-    def __init__(self, pos, image, mass, Cd=0.5, circular=False, COR=0):
+    def __init__(self, pos, image, mass, Cd=0.5, COR=0):
         self.pos = Vec2(pos[0], pos[1])
         self.angle = 0
         self.angleDir = Vec2(math.cos((90 + self.angle) * RAD), -math.sin((90 - self.angle) * RAD)).GetNormalized()
@@ -407,7 +420,6 @@ class PhysObject:
         self.acceleration = Vec2(0, 0)
         self.velocity = Vec2(0, 0)
         self.momentum = Vec2(0, 0)
-        self.circular = False
     def Draw(self, surface):
         surface.blit(self.image, self.rect)
         if DEBUG:
@@ -581,6 +593,11 @@ class Player(PhysObject):
             particleHandler.CreateEngineParticles(self, base)
             self.fuel -= 1
 
+class KeyObject(PhysObject):
+    def __init__(self, pos, image, mass, colour, Cd=0.5, COR=0):
+        super().__init__(pos, image, mass, Cd, COR)
+        self.colour = colour
+        self.lastEmission = time.time()
 
 class Collision:
     def __init__(self, object, collider):
@@ -691,23 +708,28 @@ def lINTerp(lb, ub, fraction):
         return int(lb - interval)
 
 class Particle:
-    def __init__(self, pos, velocity, timer, weightless=False):
+    def __init__(self, pos, velocity, timer, weightless=False, colour=WHITE, radius=1):
         self.pos = pos
         self.velocity = velocity
         self.elapsed = 0
         self.timer = timer
-        self.rect = pygame.Rect(self.pos.x - 1, self.pos.y - 1, 2, 2)
+        self.rect = pygame.Rect(self.pos.x - radius, self.pos.y - radius, radius*2, radius*2)
         self.weightless = weightless
+        self.colour = colour
+        self.radius = radius
+        self.acceleration = Vec2(0, 0)
     def Update(self, dt):
         self.elapsed += dt
         self.acceleration = Vec2(0, GRAVITY if GRAVITYON and not self.weightless else 0)
         self.velocity += self.acceleration * dt
         self.pos += self.velocity * dt
-        self.rect.center = tuple(Vec2(self.rect.center) + (self.velocity * dt))
+        self.rect.center = tuple(self.pos.Integer())
     def SetPos(self, pos):
         self.pos = pos
     def GetPos(self):
         return self.pos
+    def Draw(self, screen):
+        pygame.draw.circle(screen, self.colour, tuple(self.pos), self.radius)
 
 class EngineParticle(Particle):
     def __init__(self, pos, velocity, timer):
@@ -722,19 +744,34 @@ class EngineParticle(Particle):
             self.colour[2] = lINTerp(0, 255, frac)
             self.colour[3] = lINTerp(0, 255, frac)
             self.radius = lINTerp(2, 5, frac)
-    def Draw(self):
-        pygame.draw.circle(screen, self.colour, tuple(self.pos), self.radius)
+
 
 class ParticleHandler:
     def __init__(self):
         self.particles = []
-    def Update(self, dt):
+    def Update(self, screen, world, dt):
         for i, particle in enumerate(self.particles):
             particle.Update(dt)
             if particle.elapsed >= particle.timer:
                 self.particles.pop(i)
+
         for particle in self.particles:
-            particle.Draw()
+            particle.Draw(screen)
+
+        for obj in world:
+            if isinstance(obj, KeyObject) or isinstance(obj, Objective):
+                now = time.time()
+                if now - obj.lastEmission >= 1.5:
+                    self.Emit(obj, obj.colour, 1.5, Vec2(0, -5), True)
+                    obj.lastEmission = now
+
+    def Emit(self, obj, colour, life, velocity, weightless=False):
+        pos, rect = obj.GetPos(), obj.GetRect()
+        x = random.randint(int(pos - (rect.get_width() / 2)), int(pos + (rect.get_width() / 2)))
+        y = random.randint(int(pos - (rect.get_height() / 2)), int(pos + (rect.get_height() / 2)))
+
+        self.Add(Particle(Vec2(x, y), velocity, life, weightless, colour))
+
     def Add(self, particle, parent=None):
         self.particles.append(particle)
     def CreateEngineParticles(self, ship, drive):
@@ -743,31 +780,29 @@ class ParticleHandler:
             uv = drive.Inverse().GetNormalized() * 100 + random.randint(-6, 6)
             self.Add(EngineParticle(ship.engine, uv, random.uniform(0.5, 1.5)))
 
-class Objective:
-    def __init__(self, pos, width, height, trigger):
-        self.pos = pos
-        self.rect = pygame.Rect(pos.x, pos.y, width, height)
+class Objective(WorldCollider):
+    def __init__(self, pos, width, height, triggers, material="Asphalt"):
+        super().__init__(pygame.Rect(pos.x, pos.y, width, height), material)
         self.colour = GREY
-        self.trigger = trigger
+        self.triggers = triggers
         self.complete = False
+        self.lastEmission = time.time()
     def Update(self):
-        if self.trigger.GetRect().colliderect(self.rect):
-            return True
+        for trigger in self.triggers:
+            if trigger.GetRect().colliderect(self.rect) or touching(trigger, self):
+                return True
         return False
     def Draw(self, screen):
         pygame.draw.rect(screen, self.colour, self.rect)
-    def SetPos(self, pos):
-        self.pos = pos
-        self.rect.topleft = tuple(self.pos)
-    def GetPos(self):
-        return self.pos
+    def GetRect(self):
+        return self.rect
 
 class PlayerObjective(Objective):
     def __init__(self, pos, width, height, player):
-        super().__init__(pos, width, height, player)
+        super().__init__(pos, width, height, [player])
         self.colour = GREEN
 
 class PhysObjective(Objective):
     def __init__(self, pos, width, height, obj):
-        super.__init__(pos, width, height, obj)
-        self.colour = GREEN
+        super().__init__(pos, width, height, obj)
+        self.colour = MAGENTA

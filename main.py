@@ -40,6 +40,7 @@ def getCameraTrack(pos, lpos, lwidth, lheight):
     return [round(a) for a in newlpos]
 
 def level_load(level):
+    ## All level info stored as a dictionary
     info = {
         "background": os.path.join("levels", level, "background.png"),
         "world": [],
@@ -47,28 +48,40 @@ def level_load(level):
         "objectives": [],
         "player": None
     }
+
+    ## LOADING WORLD COLLIDERS ##
     with open(os.path.join("levels", level, "world.csv"), "r") as file:
         reader = csv.reader(file)
         for row in reader:
             objInfo = list(map(int, row)) # Convert all coordinate values for the rect into integers
             info["world"] = info["world"] + [WorldCollider(pygame.Rect(objInfo[0], objInfo[1], objInfo[2], objInfo[3]))]
+
+    ## LOADING PHYSICS OBJECTS (Regular) ##
     with open(os.path.join("levels", level, "objects.csv"), "r") as file:
         reader = csv.reader(file)
         for i, row in enumerate(reader):
             pos = tuple(map(int, row[0:2]))
-            physInfo = list(map(float, row[3:5])) + [bool(row[5])] + [float(row[6])]  # Convert all physInfo to floats and bool types
+            physInfo = list(map(float, row[3:5])) + [float(row[5])]  # Convert all physInfo to floats and bool types
             info["objects"] = info["objects"] + [PhysObject(pos, pygame.image.load(row[2]).convert_alpha(),
-                                                                physInfo[0], physInfo[1], physInfo[2], physInfo[3])]
+                                                                physInfo[0], physInfo[1], physInfo[2])]
+
+    ## LOADING THE PLAYER ##
     with open(os.path.join("levels", level, "player.csv"), "r") as file:
         reader = csv.reader(file)
         for row in reader:
             pos = tuple(map(int, row[0:2]))
             info["player"] = Player(pos, player_image, float(row[2]), float(row[3]), float(row[4]),bool(row[5]))
+
+    ## LOADING LEVEL OBJECTIVES ##
     with open(os.path.join("levels", level, "objectives.csv"), "r") as file:
         reader = csv.reader(file)
-        for i, row in reader:
-            objInfo = list(map(int, row))
-            info["objectives"] = info["objectives"] + [PlayerObjective(Vec2(objInfo[0], objInfo[1]), objInfo[2], objInfo[3])]
+        for row in reader:
+            objInfo = list(map(int, row[1:]))
+            if row[0] == "PLAYER":
+                info["objectives"] = info["objectives"] + [PlayerObjective(Vec2(objInfo[0], objInfo[1]), objInfo[2], objInfo[3], info["player"])]
+            elif row[0] == "PHYS":
+                info["objectives"] = info["objectives"] + [PhysObjective(Vec2(objInfo[0], objInfo[1]), objInfo[2], objInfo[3],
+                                                                           [x for x in info["objects"] if isinstance(x, KeyObject)])]
     return info
 
 
@@ -178,16 +191,16 @@ class Game:
 
         oldLPos = self.lPos
         self.lPos = getCameraTrack(player.GetPos(), self.lPos, background_image.get_size()[0], background_image.get_size()[1])
-
+        world = world + objectives
         # move game objects accordingly with the level
         diff = list(numpy.subtract(self.lPos, oldLPos))  # convert the numpy array to a regular list
         player.SetPos(self.player.GetPos() + Vec2(diff))  # PhysObjects can be moved via vector addition
         for object in objects:
             object.SetPos(object.GetPos() + Vec2(diff))
-        for objective in objectives:
-            objective.SetPos(objective.GetPos() + Vec2(diff))
+
         for particle in particleHandler.particles:
             particle.SetPos(particle.GetPos() + Vec2(diff))
+
         for wc in world:  # Worldcolliders are tracked by rects only, so use numpy list subtraction
             wc.Move(diff)
 
@@ -209,7 +222,10 @@ class Game:
         newcolliders = [x for x in world]
         newcolliders.append(player)
         for object in objects:
-            object.Update(newcolliders + [x for x in objects if x != object], dt)
+            if isinstance(object, KeyObject):
+                object.Update(newcolliders + [x for x in objects if x != object], dt, self.particleHandler)
+            else:
+                object.Update(newcolliders + [x for x in objects if x != object], dt)
             object.Draw(screen)
 
         if DEBUG:
@@ -220,7 +236,7 @@ class Game:
         newcol.append(player)
         colHandler.Update(newcol)
 
-        particleHandler.Update(dt)
+        particleHandler.Update(screen, objects, dt)
 
         keys = pygame.key.get_pressed()
         # Player Controls
