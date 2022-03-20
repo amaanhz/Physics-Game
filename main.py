@@ -5,7 +5,7 @@ import os, csv
 largeBoldMenu = pygame.font.Font(FUTURE_LIGHT, 100)
 mediumMenu = pygame.font.Font(OPTIMUS, 28)
 
-def getCameraTrack(pos, lpos, lwidth, lheight):
+def getCameraTrack(player, lpos, lwidth, lheight):
     """
     :param pos: The position of the player
     :type pos: Vec2
@@ -17,12 +17,22 @@ def getCameraTrack(pos, lpos, lwidth, lheight):
     :type lheight: int
     :return: The new level position required to move the "camera" accordingly with the player.
     """
-    x, y = pos.x, pos.y
+    x, y = player.GetPos()
+    playerRect = player.GetRect()
     swidth, sheight = WINDOW_SIZE # Screen width and height
     halfw, halfh = swidth / 2, sheight / 2
     maxWidthOffset = lwidth - swidth # The maximum width and height the level can move before the image ends
     maxHeightOffset = lheight - sheight
     newlpos = list(lpos) # New level position will be calculated and stored in a list
+
+    if not Rect(0, 0, swidth, sheight).contains(playerRect):
+        ideal = Vec2(max(x - halfw, 0), max(y - halfh, 0))
+        levelRect = Rect(0, 0, lwidth, lheight)
+        idealBottomRight = ideal + Vec2(swidth, sheight)
+        diff = idealBottomRight - Vec2(levelRect.bottomright)
+        diff.x, diff.y = max(diff.x, 0), max(diff.y, 0)
+        ideal = ideal - diff
+        return [round(a) for a in ideal.Inverse()]
 
     if x + halfw > swidth and lpos[0] > -maxWidthOffset:
         difference = x + halfw - swidth
@@ -31,12 +41,12 @@ def getCameraTrack(pos, lpos, lwidth, lheight):
         difference = abs(x - halfw)
         newlpos[0] = lpos[0] + difference
 
-    if y - halfh < 0 and lpos[1] > -maxHeightOffset:
-        difference = y - halfh
+    if y - halfh < 0 and lpos[1] < 0:
+        difference = abs(y - halfh)
         newlpos[1] = lpos[1] + difference
-    elif y + halfh > sheight and lpos[1] < 0:
+    elif y + halfh > sheight and lpos[1] > -maxHeightOffset:
         difference = y + halfh - sheight
-        newlpos[1] = lpos[1] + difference
+        newlpos[1] = lpos[1] - difference
     return [round(a) for a in newlpos]
 
 def level_load(level):
@@ -146,8 +156,8 @@ class Menu:
         if click:
             if self.buttonList[0].collide(mousePos):
                 gameData = level_load(DEBUG_LEVEL)
-                world, objects, objectives, player = gameData["world"], gameData["objects"], gameData["objectives"], gameData["player"]
-                self.state.newstate(Game(self.state, world, objects, player, objectives))
+                background, world, objects, objectives, player = gameData["background"], gameData["world"], gameData["objects"], gameData["objectives"], gameData["player"]
+                self.state.newstate(Game(self.state, background, world, objects, player, objectives))
             elif self.buttonList[2].collide(mousePos):
                 pygame.quit()
                 sys.exit()
@@ -158,17 +168,16 @@ class Menu:
                 sys.exit()
 
 class Game:
-    def __init__(self, stateobj, world, objects, player, objectives):
+    def __init__(self, stateobj, background, world, objects, player, objectives):
         self.state = stateobj
-        self.background_image = pygame.image.load("assets/background/backgroundbig.png").convert()
+        self.background_image = pygame.image.load(background).convert_alpha()
         self.level_size = self.background_image.get_size()
         self.lwidth, self.lheight = self.level_size
 
         self.world = world
-        yTop = 0 - (self.lheight - sheight)
-        self.world.append(WorldCollider(pygame.Rect(-1, yTop, 1, self.lheight)))
-        self.world.append(WorldCollider(pygame.Rect(0, yTop - 1, self.lwidth, 1)))
-        self.world.append(WorldCollider(pygame.Rect(self.lwidth, yTop, 1, self.lheight)))
+        self.world.append(WorldCollider(pygame.Rect(-1, 0, 1, self.lheight)))
+        self.world.append(WorldCollider(pygame.Rect(0, -1, self.lwidth, 1)))
+        self.world.append(WorldCollider(pygame.Rect(self.lwidth, 0, 1, self.lheight)))
         self.lPos = [0, 0]
 
         self.objects = objects
@@ -199,7 +208,7 @@ class Game:
                                                                                 self.objectives
 
         oldLPos = self.lPos
-        self.lPos = getCameraTrack(player.GetPos(), self.lPos, background_image.get_size()[0], background_image.get_size()[1])
+        self.lPos = getCameraTrack(player, self.lPos, background_image.get_size()[0], background_image.get_size()[1])
         world = world + objectives
         # move game objects accordingly with the level
         diff = list(numpy.subtract(self.lPos, oldLPos))  # convert the numpy array to a regular list
