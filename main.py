@@ -76,12 +76,20 @@ def level_load(level):
     with open(os.path.join("levels", level, "objectives.csv"), "r") as file:
         reader = csv.reader(file)
         for row in reader:
-            objInfo = list(map(int, row[1:]))
             if row[0] == "PLAYER":
+                objInfo = list(map(int, row[1:]))
                 info["objectives"] = info["objectives"] + [PlayerObjective(Vec2(objInfo[0], objInfo[1]), objInfo[2], objInfo[3], info["player"])]
             elif row[0] == "PHYS":
+                objInfo = list(map(int, row[1:]))
                 info["objectives"] = info["objectives"] + [PhysObjective(Vec2(objInfo[0], objInfo[1]), objInfo[2], objInfo[3],
                                                                            [x for x in info["objects"] if isinstance(x, KeyObject)])]
+            elif row[0] == "OBJECT":
+                pos = tuple(map(int, row[1:3]))
+                conv = list(map(float, row[4:]))
+                colour = tuple(conv[1:4])
+                info["objects"] = info["objects"] + [KeyObject(pos, pygame.image.load(row[3]).convert_alpha(), conv[0],
+                                                               colour, conv[-1], conv[-2])]
+
     return info
 
 
@@ -137,7 +145,7 @@ class Menu:
 
         if click:
             if self.buttonList[0].collide(mousePos):
-                gameData = level_load("test")
+                gameData = level_load(DEBUG_LEVEL)
                 world, objects, objectives, player = gameData["world"], gameData["objects"], gameData["objectives"], gameData["player"]
                 self.state.newstate(Game(self.state, world, objects, player, objectives))
             elif self.buttonList[2].collide(mousePos):
@@ -183,6 +191,7 @@ class Game:
         pygame.draw.rect(screen, (255, lINTerp(0, 200, self.player.fuel / self.player.tank), 0), fuelRect)
 
     def RunFrame(self, dt):
+        # Make it easier to reference everything
         background_image, world, objects, player, colHandler, particleHandler, objectives = self.background_image, \
                                                                                 self.world, \
                                                                                 self.objects, self.player, \
@@ -203,6 +212,7 @@ class Game:
 
         for wc in world:  # Worldcolliders are tracked by rects only, so use numpy list subtraction
             wc.Move(diff)
+        ##############################################
 
         screen.blit(background_image, tuple(self.lPos))
 
@@ -210,20 +220,23 @@ class Game:
 
         colliders = world + objects  # Everything the player can collide with
 
-        ## UPDATING ALL GAME OBJECTS ##
+        ## UPDATING PLAYER ##
         player.Update(colliders, dt)
         player.Draw(screen)
-
+        ## UPDATING OBJECTIVES ##
         for objective in objectives:
             objective.Update()
+            if time.time() - objective.lastEmission >= 0.1:
+                particleHandler.Emit(objective, objective.colour, 3, Vec2(random.randint(-5, 5), random.randint(-15, 0)), True)
+                objective.lastEmission = time.time()
             objective.Draw(screen)
 
-
+        ## UPDATING PHYSOBJECTS ##
         newcolliders = [x for x in world]
         newcolliders.append(player)
         for object in objects:
             if isinstance(object, KeyObject):
-                object.Update(newcolliders + [x for x in objects if x != object], dt, self.particleHandler)
+                object.Update(newcolliders + [x for x in objects if x != object], dt)
             else:
                 object.Update(newcolliders + [x for x in objects if x != object], dt)
             object.Draw(screen)
@@ -234,8 +247,9 @@ class Game:
         ###############################
         newcol = [x for x in objects]
         newcol.append(player)
+        ## HANDLE COLLISIONS ##
         colHandler.Update(newcol)
-
+        ## UPDATE PARTICLES ##
         particleHandler.Update(screen, objects, dt)
 
         keys = pygame.key.get_pressed()

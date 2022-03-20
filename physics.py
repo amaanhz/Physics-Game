@@ -766,11 +766,12 @@ class ParticleHandler:
                     obj.lastEmission = now
 
     def Emit(self, obj, colour, life, velocity, weightless=False):
-        pos, rect = obj.GetPos(), obj.GetRect()
-        x = random.randint(int(pos - (rect.get_width() / 2)), int(pos + (rect.get_width() / 2)))
-        y = random.randint(int(pos - (rect.get_height() / 2)), int(pos + (rect.get_height() / 2)))
+        pos, rect = tuple(obj.GetPos()), obj.GetRect()
+        pos = rect.center if pos != rect.center else pos
+        x = random.randint(int(pos[0] - (rect.width / 2)), int(pos[0] + (rect.width / 2)))
+        y = random.randint(int(pos[1] - (rect.height / 2)), int(pos[1] + (rect.height / 2)))
 
-        self.Add(Particle(Vec2(x, y), velocity, life, weightless, colour))
+        self.Add(Particle(Vec2(x, y), velocity, life, weightless, colour, 2))
 
     def Add(self, particle, parent=None):
         self.particles.append(particle)
@@ -783,14 +784,16 @@ class ParticleHandler:
 class Objective(WorldCollider):
     def __init__(self, pos, width, height, triggers, material="Asphalt"):
         super().__init__(pygame.Rect(pos.x, pos.y, width, height), material)
-        self.colour = GREY
+        self.original, self.colour = GREY, GREY
         self.triggers = triggers
         self.complete = False
         self.lastEmission = time.time()
     def Update(self):
         for trigger in self.triggers:
             if trigger.GetRect().colliderect(self.rect) or touching(trigger, self):
+                self.colour = GREEN
                 return True
+        self.colour = self.original
         return False
     def Draw(self, screen):
         pygame.draw.rect(screen, self.colour, self.rect)
@@ -800,9 +803,9 @@ class Objective(WorldCollider):
 class PlayerObjective(Objective):
     def __init__(self, pos, width, height, player):
         super().__init__(pos, width, height, [player])
-        self.colour = GREEN
+        self.original, self.colour = YELLOW, YELLOW
 
 class PhysObjective(Objective):
     def __init__(self, pos, width, height, obj):
         super().__init__(pos, width, height, obj)
-        self.colour = MAGENTA
+        self.original, self.colour = MAGENTA, MAGENTA
