@@ -207,28 +207,32 @@ class Game:
                                                                                 self.colHandler, self.particleHandler, \
                                                                                 self.objectives
 
+        world = world + objectives
+        colliders = world + objects  # Everything the player can collide with
+
         oldLPos = self.lPos
         self.lPos = getCameraTrack(player, self.lPos, background_image.get_size()[0], background_image.get_size()[1])
-        world = world + objectives
-        # move game objects accordingly with the level
-        diff = list(numpy.subtract(self.lPos, oldLPos))  # convert the numpy array to a regular list
 
-        CollisionHandler.SafeMove(player, world, Vec2(diff))  # PhysObjects can be moved via vector addition
+        # move game objects accordingly with the level
+        diff = Vec2(list(numpy.subtract(self.lPos, oldLPos)))  # convert the numpy array to a regular list and then to a Vec2
+
+        CollisionHandler.SafeMove(player, world, diff)
         for object in objects:
-            CollisionHandler.SafeMove(object, world, Vec2(diff))
+            CollisionHandler.SafeMove(object, world, diff)
 
         for particle in particleHandler.particles:
-            particle.SetPos(particle.GetPos() + Vec2(diff))
+            #CollisionHandler.SafeMove(particle, world, diff)
+            particle.SetPos(particle.GetPos() + diff)
 
-        for wc in world:  # Worldcolliders are tracked by rects only, so use numpy list subtraction
-            CollisionHandler.SafeMove(wc, objects, Vec2(diff))
+        for wc in world:
+            CollisionHandler.SafeMove(wc, objects, diff)
         ##############################################
 
         screen.blit(background_image, tuple(self.lPos))
 
         self.DrawHUD()
 
-        colliders = world + objects  # Everything the player can collide with
+
 
         ## UPDATING PLAYER ##
         player.Update(colliders, dt)
@@ -260,7 +264,7 @@ class Game:
         ## HANDLE COLLISIONS ##
         colHandler.Update(newcol)
         ## UPDATE PARTICLES ##
-        particleHandler.Update(screen, objects, dt)
+        particleHandler.Update(screen, colliders, dt)
 
         keys = pygame.key.get_pressed()
         # Player Controls

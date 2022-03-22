@@ -667,40 +667,38 @@ class CollisionHandler:
                       "y": False}
 
         ## HANDLE X MOVEMENT ##
-        prevposx = object.pos.x
         object.pos.x += delta.x
         if isinstance(object, WorldCollider):
-            object.rect.left = int(object.pos.x)
+            object.rect.left = object.pos.x
         else:
-            object.rect.centerx = int(object.pos.x)
+            object.rect.centerx = object.pos.x
         hit_list = coltest(object.rect, colliders)
 
         for entity in hit_list:
-            if object.velocity.x > 0:
+            if delta.x > 0:
                 object.rect.right = entity.GetRect().left
                 object.pos = Vec2(object.rect.center)
 
-            elif object.velocity.x < 0:
+            elif delta.x < 0:
                 object.rect.left = entity.GetRect().right
                 object.pos = Vec2(object.rect.center)
 
             returnVals["x"] = True
 
         ###########################################
-        prevposy = object.pos.y
         object.pos.y += delta.y
         if isinstance(object, WorldCollider):
-            object.rect.top = int(object.pos.y)
+            object.rect.top = object.pos.y
         else:
-            object.rect.centery = int(object.pos.y)
+            object.rect.centery = object.pos.y
         hit_list = coltest(object.rect, colliders)
 
         for entity in hit_list:
-            if object.velocity.y > 0:
+            if delta.y > 0:
                 object.rect.bottom = entity.GetRect().top
                 object.pos = Vec2(object.rect.center)
 
-            elif object.velocity.y < 0:
+            elif delta.y < 0:
                 object.rect.top = entity.GetRect().bottom
                 object.pos = Vec2(object.rect.center)
 
@@ -717,7 +715,7 @@ def lINTerp(lb, ub, fraction):
         return int(lb - interval)
 
 class Particle:
-    def __init__(self, pos, velocity, timer, weightless=False, colour=WHITE, radius=1):
+    def __init__(self, pos, velocity, timer, weightless=False, colour=WHITE, radius=1, colSim=False):
         self.pos = pos
         self.velocity = velocity
         self.elapsed = 0
@@ -727,26 +725,38 @@ class Particle:
         self.colour = colour
         self.radius = radius
         self.acceleration = Vec2(0, 0)
-    def Update(self, dt):
+        self.colSim = colSim
+    def Update(self, dt, colliders=None):
         self.elapsed += dt
         self.acceleration = Vec2(0, GRAVITY if GRAVITYON and not self.weightless else 0)
         self.velocity += self.acceleration * dt
-        self.pos += self.velocity * dt
-        self.rect.center = tuple(self.pos.Integer())
+        if self.colSim:
+            touch = CollisionHandler.SafeMove(self, colliders, self.velocity * dt * METRE)
+            if touch["x"]:
+                self.velocity.x = -0.2
+            if touch["y"]:
+                self.velocity.y *= -0.2
+        else:
+            self.pos += self.velocity * dt * METRE
+        self.rect.center = tuple(self.pos)
     def SetPos(self, pos):
         self.pos = pos
     def GetPos(self):
         return self.pos
     def Draw(self, screen):
         pygame.draw.circle(screen, self.colour, tuple(self.pos), self.radius)
+        if DEBUG:
+            pygame.draw.rect(screen, RED, self.rect, 1)
+
 
 class EngineParticle(Particle):
     def __init__(self, pos, velocity, timer):
         super().__init__(pos, velocity, timer)
+        self.colSim = True
         self.colour = [255, 174, 0, 255]
         self.radius = 2
-    def Update(self, dt):
-        super().Update(dt)
+    def Update(self, dt, colliders):
+        super().Update(dt, colliders)
         if self.elapsed < self.timer:
             frac = self.elapsed / self.timer
             self.colour[1] = lINTerp(174, 255, frac)
@@ -760,7 +770,7 @@ class ParticleHandler:
         self.particles = []
     def Update(self, screen, world, dt):
         for i, particle in enumerate(self.particles):
-            particle.Update(dt)
+            particle.Update(dt, world)
             if particle.elapsed >= particle.timer:
                 self.particles.pop(i)
 
@@ -786,8 +796,8 @@ class ParticleHandler:
         self.particles.append(particle)
     def CreateEngineParticles(self, ship, drive):
         for i in range(0, 10):
-            x, y = tuple(ship.engine)
-            uv = drive.Inverse().GetNormalized() * 100 + random.randint(-6, 6)
+            x, y = tuple(ship.engine) # Starting pos is the engine
+            uv = drive.Inverse().GetNormalized() + random.uniform(-1, 1)
             self.Add(EngineParticle(ship.engine, uv, random.uniform(0.5, 1.5)))
 
 class Objective(WorldCollider):
