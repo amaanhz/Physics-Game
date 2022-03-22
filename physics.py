@@ -386,15 +386,17 @@ class ForceManager:
 class WorldCollider:
     def __init__(self, rect, material="Asphalt"):
         self.rect = rect
+        self.pos = Vec2(rect.topleft)
         self.material = MATERIALS[material]
     def DrawDebug(self):
         pygame.draw.rect(screen, RED, self.rect, 1)
     def GetRect(self):
         return self.rect
     def GetPos(self):
-        return self.rect.topleft
+        return self.pos
     def Move(self, delta):
-        self.rect.topleft = tuple(numpy.add(self.GetPos(), delta))
+        self.pos += delta
+        self.rect.topleft = tuple(self.pos)
     def GetMaterial(self):
         return self.material
     def GetMuStatic(self):
@@ -475,72 +477,31 @@ class PhysObject:
 
         ##################################################
 
+        tempcolliders = [x for x in colliders if isinstance(x, WorldCollider)]
+        delta = self.velocity * dt * METRE
 
+        bounceAxis = CollisionHandler.SafeMove(self, tempcolliders, delta)
 
-        collision_types = {"top": False, "bottom": False, "left": False, "right": False}
-
-
-        ## HANDLE X MOVEMENT ##
-        prevposx = self.pos.x
-        self.pos.x += self.velocity.x * dt * METRE
-        self.rect.centerx = round(self.pos.x)
-        hit_list = coltest(self.rect, colliders)
-
-        for entity in hit_list:
-            if isinstance(entity, WorldCollider):
-                if self.velocity.x > 0:
-                    self.rect.right = entity.GetRect().left
-                    self.pos = Vec2(self.rect.center)
-                    collision_types["right"] = True
-
-                elif self.velocity.x < 0:
-                    self.rect.left = entity.GetRect().right
-                    self.pos = Vec2(self.rect.center)
-                    collision_types["left"] = True
-
-                if self.COR > 0:
-                    bounce = abs(self.velocity.x) * self.COR
-                    if bounce > 1:
-                        self.velocity.x *= -1 * self.COR
-                    else:
-                        self.velocity.x = 0
+        if bounceAxis["x"]:
+            if self.COR > 0:
+                bounce = abs(self.velocity.x) * self.COR
+                if bounce > 1:
+                    self.velocity.x *= -1 * self.COR
                 else:
                     self.velocity.x = 0
-        #######################################
-        if DEBUG and isinstance(self, Player):
-            print(f"Rect X: {self.rect.x}")
-        #######################################
+            else:
+                self.velocity.x = 0
 
-        ## HANDLE Y MOVEMENT ##
-        prevposy = self.pos.y
-        self.pos.y += self.velocity.y * dt * METRE
-        self.rect.centery = round(self.pos.y)
-        hit_list = coltest(self.rect, colliders)
-
-        for entity in hit_list:
-            if isinstance(entity, WorldCollider):
-                if self.velocity.y > 0:
-                    self.rect.bottom = entity.GetRect().top
-                    self.pos = Vec2(self.rect.center)
-                    collision_types["bottom"] = True
-
-                elif self.velocity.y < 0:
-                    self.rect.top = entity.GetRect().bottom
-                    self.pos = Vec2(self.rect.center)
-                    collision_types["top"] = True
-
-                if self.COR > 0:
-                    bounce = abs(self.velocity.y) * self.COR
-                    if bounce > 1:
-                        self.velocity.y *= -1 * self.COR
-                    else:
-                        self.velocity.y = 0
+        if bounceAxis["y"]:
+            if self.COR > 0:
+                bounce = abs(self.velocity.y) * self.COR
+                if bounce > 1:
+                    self.velocity.y *= -1 * self.COR
                 else:
                     self.velocity.y = 0
-        #######################################
-        if DEBUG and isinstance(self, Player):
-            print(f"Rect Y: {self.rect.y}")
-        #######################################
+            else:
+                self.velocity.y = 0
+
     def SetVelocity(self, vx, vy):
         self.velocity = Vec2(vx, vy)
     def SetVelocityVec2(self, v2):
@@ -699,6 +660,54 @@ class CollisionHandler:
                 if not collision.CheckOverlap():
                     collision.PreRemoval()
                     self.collisions.pop(i)
+
+    @staticmethod
+    def SafeMove(object, colliders, delta):
+        returnVals = {"x": False,
+                      "y": False}
+
+        ## HANDLE X MOVEMENT ##
+        prevposx = object.pos.x
+        object.pos.x += delta.x
+        if isinstance(object, WorldCollider):
+            object.rect.left = int(object.pos.x)
+        else:
+            object.rect.centerx = int(object.pos.x)
+        hit_list = coltest(object.rect, colliders)
+
+        for entity in hit_list:
+            if object.velocity.x > 0:
+                object.rect.right = entity.GetRect().left
+                object.pos = Vec2(object.rect.center)
+
+            elif object.velocity.x < 0:
+                object.rect.left = entity.GetRect().right
+                object.pos = Vec2(object.rect.center)
+
+            returnVals["x"] = True
+
+        ###########################################
+        prevposy = object.pos.y
+        object.pos.y += delta.y
+        if isinstance(object, WorldCollider):
+            object.rect.top = int(object.pos.y)
+        else:
+            object.rect.centery = int(object.pos.y)
+        hit_list = coltest(object.rect, colliders)
+
+        for entity in hit_list:
+            if object.velocity.y > 0:
+                object.rect.bottom = entity.GetRect().top
+                object.pos = Vec2(object.rect.center)
+
+            elif object.velocity.y < 0:
+                object.rect.top = entity.GetRect().bottom
+                object.pos = Vec2(object.rect.center)
+
+            returnVals["y"] = True
+
+        return returnVals
+
 
 def lINTerp(lb, ub, fraction):
     interval = (abs(ub - lb) * fraction)

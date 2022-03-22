@@ -212,15 +212,16 @@ class Game:
         world = world + objectives
         # move game objects accordingly with the level
         diff = list(numpy.subtract(self.lPos, oldLPos))  # convert the numpy array to a regular list
-        player.SetPos(self.player.GetPos() + Vec2(diff))  # PhysObjects can be moved via vector addition
+
+        CollisionHandler.SafeMove(player, world, Vec2(diff))  # PhysObjects can be moved via vector addition
         for object in objects:
-            object.SetPos(object.GetPos() + Vec2(diff))
+            CollisionHandler.SafeMove(object, world, Vec2(diff))
 
         for particle in particleHandler.particles:
             particle.SetPos(particle.GetPos() + Vec2(diff))
 
         for wc in world:  # Worldcolliders are tracked by rects only, so use numpy list subtraction
-            wc.Move(diff)
+            CollisionHandler.SafeMove(wc, objects, Vec2(diff))
         ##############################################
 
         screen.blit(background_image, tuple(self.lPos))
