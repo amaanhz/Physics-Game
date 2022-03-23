@@ -1,2 +1,1 @@
-OBJECT,600,100,assets/sprites/pinkcube.png,75,181,49,201,0.5,0.1
-PHYS,550,200,100,10
+PLAYER	1200	2392	365	33

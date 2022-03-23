@@ -240,9 +240,9 @@ class Game:
         ## UPDATING OBJECTIVES ##
         for objective in objectives:
             objective.Update()
-            if time.time() - objective.lastEmission >= 0.1:
-                particleHandler.Emit(objective, objective.colour, 3, Vec2(random.randint(-5, 5), random.randint(-15, 0)), True)
-                objective.lastEmission = time.time()
+            # if time.time() - objective.lastEmission >= 0.1:
+            #
+            #     objective.lastEmission = time.time()
             objective.Draw(screen)
 
         ## UPDATING PHYSOBJECTS ##
