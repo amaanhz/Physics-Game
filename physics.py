@@ -784,7 +784,7 @@ class ParticleHandler:
             if isinstance(obj, KeyObject) or isinstance(obj, Objective):
                 now = time.time()
                 if now - obj.lastEmission >= 0.1:
-                    self.Emit(obj, obj.colour, 3, Vec2(random.uniform(-1, 1), random.uniform(-5, 0)), True, True, obj)
+                    self.Emit(obj, obj.colour, 3, Vec2(random.uniform(-1, 1), random.uniform(-5, -2)), True, False, obj)
                     obj.lastEmission = now
 
     def Emit(self, obj, colour, life, velocity, weightless=False, colSim=False, parent=None):

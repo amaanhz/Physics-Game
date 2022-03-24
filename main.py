@@ -4,6 +4,7 @@ import os, csv
 
 largeBoldMenu = pygame.font.Font(FUTURE_LIGHT, 100)
 mediumMenu = pygame.font.Font(OPTIMUS, 28)
+hudFont = pygame.font.Font(UNISPACE, 30)
 
 def getCameraTrack(player, lpos, lwidth, lheight):
     """
@@ -32,7 +33,7 @@ def getCameraTrack(player, lpos, lwidth, lheight):
         diff = idealBottomRight - Vec2(levelRect.bottomright)
         diff.x, diff.y = max(diff.x, 0), max(diff.y, 0)
         ideal = ideal - diff
-        return [round(a) for a in ideal.Inverse()]
+        return [int(a) for a in ideal.Inverse()]
 
     if x + halfw > swidth and lpos[0] > -maxWidthOffset:
         difference = x + halfw - swidth
@@ -47,7 +48,7 @@ def getCameraTrack(player, lpos, lwidth, lheight):
     elif y + halfh > sheight and lpos[1] > -maxHeightOffset:
         difference = y + halfh - sheight
         newlpos[1] = lpos[1] - difference
-    return [round(a) for a in newlpos]
+    return [int(a) for a in newlpos]
 
 def level_load(level):
     ## All level info stored as a dictionary
@@ -167,6 +168,24 @@ class Menu:
                 pygame.quit()
                 sys.exit()
 
+class Timer:
+    def __init__(self, pos, active=True):
+        self.pos = pos
+        self.epoch = time.time()
+        self.formattedTime = ""
+        self.elapsed = 0
+        self.active = active
+    def Update(self):
+        if self.active:
+            self.elapsed = time.time() - self.epoch
+            minutes = int(self.elapsed // 60)
+            secondsRemaining = int(self.elapsed - minutes * 60)
+            self.formattedTime = f"{'0' if minutes < 10 else ''}{str(minutes)}:{'0' if secondsRemaining < 10 else ''}{str(secondsRemaining)}"
+    def Draw(self):
+        render_time = hudFont.render(self.formattedTime, True, WHITE)
+        screen.blit(render_time, self.pos)
+
+
 class Game:
     def __init__(self, stateobj, background, world, objects, player, objectives):
         self.state = stateobj
@@ -186,10 +205,11 @@ class Game:
 
         self.colHandler = CollisionHandler(self.level_size)
         self.particleHandler = ParticleHandler()
+        self.timer = Timer((0,0))
     def DrawHUD(self):
         font = pygame.font.Font(None, 30)
-        render_fps = font.render(str(int(clock.get_fps())), True, WHITE)
-        screen.blit(render_fps, (0, 0))
+        #render_fps = font.render(str(int(clock.get_fps())), True, WHITE)
+        #screen.blit(render_fps, (0, 0))
         render_mousepos = font.render(str(pygame.mouse.get_pos()), True, WHITE)
         screen.blit(render_mousepos, (500, 0))
         fuelBackgroundRect = pygame.Rect(0, 0, int(0.75 * swidth), int(0.03 * sheight))
@@ -207,6 +227,8 @@ class Game:
                                                                                 self.colHandler, self.particleHandler, \
                                                                                 self.objectives
 
+        self.timer.Update()
+
         world = world + objectives
         colliders = world + objects  # Everything the player can collide with
 
@@ -216,22 +238,31 @@ class Game:
         # move game objects accordingly with the level
         diff = Vec2(list(numpy.subtract(self.lPos, oldLPos)))  # convert the numpy array to a regular list and then to a Vec2
 
-        CollisionHandler.SafeMove(player, world, diff)
-        for object in objects:
-            CollisionHandler.SafeMove(object, world, diff)
+        if not Rect(0, 0, swidth, sheight).contains(player.GetRect()):
+            player.SetPos(player.GetPos() + diff)
+            for object in objects:
+                object.SetPos(object.GetPos() + diff)
+            for particle in particleHandler.particles:
+                particle.SetPos(particle.GetPos() + diff)
+            for wc in world:
+                wc.Move(diff)
+        else:
+            CollisionHandler.SafeMove(player, world, diff)
+            for object in objects:
+                CollisionHandler.SafeMove(object, world, diff)
 
-        for particle in particleHandler.particles:
-            #CollisionHandler.SafeMove(particle, world, diff)
-            particle.SetPos(particle.GetPos() + diff)
+            for particle in particleHandler.particles:
+                #CollisionHandler.SafeMove(particle, world, diff)
+                particle.SetPos(particle.GetPos() + diff)
 
-        for wc in world:
-            CollisionHandler.SafeMove(wc, objects, diff)
+            for wc in world:
+                CollisionHandler.SafeMove(wc, objects, diff)
         ##############################################
 
         screen.blit(background_image, tuple(self.lPos))
 
+        self.timer.Draw()
         self.DrawHUD()
-
 
 
         ## UPDATING PLAYER ##

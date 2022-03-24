@@ -16,6 +16,7 @@ MAGENTA = (181, 49, 201)
 OPTIMUS = os.path.join("assets", "fonts", "Optimus.otf")
 OPTIMUS_BOLD = os.path.join("assets", "fonts", "Optimus_Bold.otf")
 FUTURE_LIGHT = os.path.join("assets", "fonts", "Future_Light.ttf")
+UNISPACE = os.path.join("assets", "fonts", "unispace_rg.ttf")
 
 
 
