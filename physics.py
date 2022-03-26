@@ -667,25 +667,30 @@ class CollisionHandler:
                       "y": False}
 
         ## HANDLE X MOVEMENT ##
+        oldRect = copy.deepcopy(object.GetRect())
         object.pos.x += delta.x
         if isinstance(object, WorldCollider):
             object.rect.left = object.pos.x
         else:
             object.rect.centerx = object.pos.x
+        colliders = [x for x in colliders if object != x]
         hit_list = coltest(object.rect, colliders)
 
+
         for entity in hit_list:
-            if delta.x > 0:
+            if delta.x > 0 and oldRect.right <= entity.rect.left:
                 object.rect.right = entity.GetRect().left
                 object.pos = Vec2(object.rect.center)
 
-            elif delta.x < 0:
+            elif delta.x < 0 and oldRect.left >= entity.rect.right:
                 object.rect.left = entity.GetRect().right
                 object.pos = Vec2(object.rect.center)
 
             returnVals["x"] = True
 
         ###########################################
+
+        oldRect = copy.deepcopy(object.GetRect())
         object.pos.y += delta.y
         if isinstance(object, WorldCollider):
             object.rect.top = object.pos.y
@@ -694,15 +699,15 @@ class CollisionHandler:
         hit_list = coltest(object.rect, colliders)
 
         for entity in hit_list:
-            if delta.y > 0:
-                object.rect.bottom = entity.GetRect().top
-                object.pos = Vec2(object.rect.center)
+                if delta.y > 0 and oldRect.bottom <= entity.rect.top:
+                    object.rect.bottom = entity.GetRect().top
+                    object.pos = Vec2(object.rect.center)
 
-            elif delta.y < 0:
-                object.rect.top = entity.GetRect().bottom
-                object.pos = Vec2(object.rect.center)
+                elif delta.y < 0 and oldRect.top >= entity.rect.bottom:
+                    object.rect.top = entity.GetRect().bottom
+                    object.pos = Vec2(object.rect.center)
 
-            returnVals["y"] = True
+                returnVals["y"] = True
 
         return returnVals
 
@@ -750,6 +755,8 @@ class Particle:
         pygame.draw.circle(screen, self.colour, tuple(self.pos), self.radius)
         if DEBUG:
             pygame.draw.rect(screen, RED, self.rect, 1)
+    def GetRect(self):
+        return self.rect
 
 
 class EngineParticle(Particle):

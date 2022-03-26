@@ -248,6 +248,9 @@ class Game:
                 wc.Move(diff)
         else:
             CollisionHandler.SafeMove(player, world, diff)
+            for wc in world:
+                wc.Move(diff)
+
             for object in objects:
                 CollisionHandler.SafeMove(object, world, diff)
 
@@ -255,8 +258,7 @@ class Game:
                 #CollisionHandler.SafeMove(particle, world, diff)
                 particle.SetPos(particle.GetPos() + diff)
 
-            for wc in world:
-                CollisionHandler.SafeMove(wc, objects, diff)
+
         ##############################################
 
         screen.blit(background_image, tuple(self.lPos))
