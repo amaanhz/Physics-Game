@@ -9,13 +9,13 @@ pygame.init()
 pygame.display.set_caption("Physics")
 
 class Material:
-    def __init__(self, static, kinetic, cor):
+    def __init__(self, static, kinetic):
         self.static = static
         self.kinetic = kinetic
-        self.bounceModifier = cor
 
 MATERIALS = {
-    "Asphalt": Material(0.9, 0.65, 0.8)
+    "Asphalt": Material(0.9, 0.65),
+    "Steel": Material(0.21, 0.133)
 }
 
 def trace(source, dir, target, LEVEL_SIZE, detailed=False):
@@ -266,7 +266,7 @@ class ForceManager:
         ## REMOVE REDUNDANT FORCES FROM ENTITIES NOT IN CONTACT/NOT OURSELF OR NOT APPLICABLE ##
         for i, force in enumerate(self.forces):
             # Contact Check (applies to any force)
-            if force.source not in touchingEnts and force.source != self.parent:
+            if force.source not in touchingEnts and force.source != self.parent and not isinstance(force.source, AirStream):
                 self.forces.pop(i)
 
             # Friction Check
@@ -501,7 +501,6 @@ class PhysObject:
                     self.velocity.y = 0
             else:
                 self.velocity.y = 0
-
     def SetVelocity(self, vx, vy):
         self.velocity = Vec2(vx, vy)
     def SetVelocityVec2(self, v2):
@@ -509,6 +508,12 @@ class PhysObject:
     def GetVelocity(self):
         return self.velocity
     def AddForce(self, source, name, force):
+        """
+        :param source:
+        :param name:
+        :param force:
+        :return:
+        """
         if type(name) != str:
             raise TypeError("Name must be of type String")
         self.forces.AddForce(source, name, force)
@@ -781,18 +786,22 @@ class ParticleHandler:
     def Update(self, screen, world, dt):
         for i, particle in enumerate(self.particles):
             particle.Update(dt, world)
-            if particle.elapsed >= particle.timer:
+            if particle.elapsed >= particle.timer != 0:
                 self.particles.pop(i)
 
         for particle in self.particles:
             particle.Draw(screen)
 
         for obj in world:
+            now = time.time()
             if isinstance(obj, KeyObject) or isinstance(obj, Objective):
-                now = time.time()
                 if now - obj.lastEmission >= 0.1:
                     self.Emit(obj, obj.colour, 3, Vec2(random.uniform(-1, 1), random.uniform(-5, -2)), True, False, obj)
                     obj.lastEmission = now
+            if isinstance(obj, AirStream):
+                if now - obj.lastEmission >= 0.01:
+                    velocity = obj.GetForce().GetNormalized() * 30 * (obj.GetForce().GetSqrMag() / (5000 ** 2))
+                    self.Emit(obj, WHITE, 3, velocity, True, True, obj)
 
     def Emit(self, obj, colour, life, velocity, weightless=False, colSim=False, parent=None):
         pos, rect = tuple(obj.GetPos()), obj.GetRect()
@@ -801,6 +810,7 @@ class ParticleHandler:
         y = random.randint(int(pos[1] - (rect.height / 2)), int(pos[1] + (rect.height / 2)))
 
         self.Add(Particle(Vec2(x, y), velocity, life, weightless, colour, 2, colSim, parent))
+
 
     def Add(self, particle, parent=None):
         self.particles.append(particle)
@@ -838,3 +848,58 @@ class PhysObjective(Objective):
     def __init__(self, pos, width, height, obj):
         super().__init__(pos, width, height, obj)
         self.original, self.colour = MAGENTA, MAGENTA
+
+class Obstacle(WorldCollider):
+    def __init__(self, pos, width, height, player):
+        super().__init__(pygame.Rect(pos.x, pos.y, width, height), material="Asphalt")
+        self.colour = RED
+        self.player = player
+    def Update(self, player):
+        if self.player.GetRect().colliderect(self.rect) or touching(self.player, self):
+            print("GAME OVER!!!!!")
+            return True
+        return False
+    def Draw(self, screen):
+        pygame.draw.rect(screen, self.colour, self.rect)
+    def GetRect(self):
+        return self.rect
+
+class AirStream(WorldCollider):
+    def __init__(self, pos, width, height, streamWidth, streamHeight, force):
+        super().__init__(pygame.Rect(pos.x, pos.y, width, height), material="Steel")
+        self.colour = STEEL
+        self.force = force
+        self.lastEmission = time.time()
+        self.oldPos = copy.deepcopy(self.pos)
+
+        if streamWidth != 0:
+            if streamWidth > 0:
+                self.streamRect = pygame.Rect(*self.rect.topright, streamWidth, height)
+            else:
+                self.streamRect = pygame.Rect(pos.x + streamWidth, pos.y, streamWidth, height)
+        else:
+            if streamHeight > 0:
+                self.streamRect = pygame.Rect(*self.rect.bottomleft, width, streamHeight)
+            else:
+                self.streamRect = pygame.Rect(pos.x, pos.y + streamHeight, width, streamHeight)
+
+    def Update(self, objects):
+        for obj in objects:
+            if self.streamRect.contains(obj.GetRect()) or self.streamRect.colliderect(obj.GetRect()):
+                obj.AddForce(self, "Wind", self.force)
+            else:
+                obj.RemoveForce(self, "Wind")
+
+        if self.pos - self.oldPos != Vec2(0, 0): # check if the source was moved and move the airstream accordingly
+            self.streamRect.topleft = tuple(Vec2(self.streamRect.topleft) + (self.pos - self.oldPos))
+            self.oldPos = copy.deepcopy(self.pos)
+    def Draw(self, screen):
+        pygame.draw.rect(screen, self.colour, self.rect)
+        if DEBUG:
+            pygame.draw.rect(screen, WHITE, self.streamRect, 1)
+    def GetForce(self):
+        return self.force
+    def GetRect(self):
+        return self.rect
+
+

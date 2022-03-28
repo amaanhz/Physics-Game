@@ -57,6 +57,8 @@ def level_load(level):
         "world": [],
         "objects": [],
         "objectives": [],
+        "obstacles": [],
+        "hazards": [],
         "player": None
     }
 
@@ -100,6 +102,24 @@ def level_load(level):
                 colour = tuple(conv[1:4])
                 info["objects"] = info["objects"] + [KeyObject(pos, pygame.image.load(row[3]).convert_alpha(), conv[0],
                                                                colour, conv[-1], conv[-2])]
+
+    ## LOADING OBSTACLES ##
+    with open(os.path.join("levels", level, "obstacles.csv"), "r") as file:
+        reader = csv.reader(file)
+        for row in reader:
+            objInfo = list(map(int, row))  # Convert all coordinate values for the rect into integers
+            pos = Vec2(objInfo[0], objInfo[1])
+            info["obstacles"] = info["obstacles"] + [Obstacle(pos, objInfo[2], objInfo[3], info["player"])]
+
+    ## LOADING HAZARDS (AIRSTREAMS) ##
+    with open(os.path.join("levels", level, "hazards.csv"), "r") as file:
+        reader = csv.reader(file)
+        for row in reader:
+            objInfo = list(map(int, row))  # Convert all coordinate values for the rect into integers
+            pos = Vec2(objInfo[0], objInfo[1])
+            force = Vec2(objInfo[-2], objInfo[-1])
+            info["hazards"] = info["hazards"] + [AirStream(pos, objInfo[2], objInfo[3], objInfo[4], objInfo[5], force)]
+
 
     return info
 
@@ -157,8 +177,9 @@ class Menu:
         if click:
             if self.buttonList[0].collide(mousePos):
                 gameData = level_load(DEBUG_LEVEL)
-                background, world, objects, objectives, player = gameData["background"], gameData["world"], gameData["objects"], gameData["objectives"], gameData["player"]
-                self.state.newstate(Game(self.state, background, world, objects, player, objectives))
+                background, world, objects, objectives, obstacles, hazards, player = gameData["background"], gameData["world"], \
+                    gameData["objects"], gameData["objectives"], gameData["obstacles"], gameData["hazards"], gameData["player"]
+                self.state.newstate(Game(self.state, background, world, objects, player, objectives, obstacles, hazards))
             elif self.buttonList[2].collide(mousePos):
                 pygame.quit()
                 sys.exit()
@@ -187,7 +208,7 @@ class Timer:
 
 
 class Game:
-    def __init__(self, stateobj, background, world, objects, player, objectives):
+    def __init__(self, stateobj, background, world, objects, player, objectives, obstacles, hazards):
         self.state = stateobj
         self.background_image = pygame.image.load(background).convert_alpha()
         self.level_size = self.background_image.get_size()
@@ -202,6 +223,8 @@ class Game:
         self.objects = objects
         self.player = player
         self.objectives = objectives
+        self.obstacles = obstacles
+        self.hazards = hazards
 
         self.colHandler = CollisionHandler(self.level_size)
         self.particleHandler = ParticleHandler()
@@ -221,15 +244,14 @@ class Game:
 
     def RunFrame(self, dt):
         # Make it easier to reference everything
-        background_image, world, objects, player, colHandler, particleHandler, objectives = self.background_image, \
-                                                                                self.world, \
-                                                                                self.objects, self.player, \
-                                                                                self.colHandler, self.particleHandler, \
-                                                                                self.objectives
+        background_image, world, objects, player, colHandler, particleHandler, objectives, obstacles, hazards = \
+            self.background_image, \
+            self.world, self.objects, self.player, self.colHandler, self.particleHandler, self.objectives, \
+            self.obstacles, self.hazards
 
         self.timer.Update()
 
-        world = world + objectives
+        world = world + objectives + obstacles + hazards
         colliders = world + objects  # Everything the player can collide with
 
         oldLPos = self.lPos
@@ -266,11 +288,15 @@ class Game:
         self.timer.Draw()
         self.DrawHUD()
 
+        for hazard in hazards:
+            hazard.Update(objects + [player])
+            hazard.Draw(screen)
 
-        ## UPDATING PLAYER ##
-        player.Update(colliders, dt)
-        player.Draw(screen)
         ## UPDATING OBJECTIVES ##
+        for obstacle in obstacles:
+            obstacle.Update(player)
+            obstacle.Draw(screen)
+
         for objective in objectives:
             objective.Update()
             # if time.time() - objective.lastEmission >= 0.1:
@@ -278,14 +304,15 @@ class Game:
             #     objective.lastEmission = time.time()
             objective.Draw(screen)
 
+        ## UPDATING PLAYER ##
+        player.Update(colliders, dt)
+        player.Draw(screen)
+
         ## UPDATING PHYSOBJECTS ##
         newcolliders = [x for x in world]
         newcolliders.append(player)
         for object in objects:
-            if isinstance(object, KeyObject):
-                object.Update(newcolliders + [x for x in objects if x != object], dt)
-            else:
-                object.Update(newcolliders + [x for x in objects if x != object], dt)
+            object.Update(newcolliders + [x for x in objects if x != object], dt)
             object.Draw(screen)
 
         if DEBUG:
