@@ -746,9 +746,9 @@ class Particle:
                 colliders.remove(self.parent)
             touch = CollisionHandler.SafeMove(self, colliders, self.velocity * dt * METRE)
             if touch["x"]:
-                self.velocity.x = -0.2
+                self.velocity.x *= -0.8
             if touch["y"]:
-                self.velocity.y *= -0.2
+                self.velocity.y *= -0.8
         else:
             self.pos += self.velocity * dt * METRE
         self.rect.center = tuple(self.pos)
@@ -798,10 +798,11 @@ class ParticleHandler:
                 if now - obj.lastEmission >= 0.1:
                     self.Emit(obj, obj.colour, 3, Vec2(random.uniform(-1, 1), random.uniform(-5, -2)), True, False, obj)
                     obj.lastEmission = now
-            if isinstance(obj, AirStream):
-                if now - obj.lastEmission >= 0.01:
-                    velocity = obj.GetForce().GetNormalized() * 30 * (obj.GetForce().GetSqrMag() / (5000 ** 2))
-                    self.Emit(obj, WHITE, 3, velocity, True, True, obj)
+            if type(obj) == AirStream:
+                if now - obj.lastEmission >= 0.1:
+                    velocity = obj.GetForce().GetNormalized() * 30 * (obj.GetForce().GetSqrMag() / (2000 ** 2))
+                    self.Emit(obj, WHITE, 8, velocity, True)
+                    obj.lastEmission = now
 
     def Emit(self, obj, colour, life, velocity, weightless=False, colSim=False, parent=None):
         pos, rect = tuple(obj.GetPos()), obj.GetRect()
@@ -899,7 +900,5 @@ class AirStream(WorldCollider):
             pygame.draw.rect(screen, WHITE, self.streamRect, 1)
     def GetForce(self):
         return self.force
-    def GetRect(self):
-        return self.rect
 
 

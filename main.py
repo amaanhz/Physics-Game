@@ -288,6 +288,8 @@ class Game:
         self.timer.Draw()
         self.DrawHUD()
 
+        particleHandler.Update(screen, colliders + [player], dt)
+
         for hazard in hazards:
             hazard.Update(objects + [player])
             hazard.Draw(screen)
@@ -299,9 +301,6 @@ class Game:
 
         for objective in objectives:
             objective.Update()
-            # if time.time() - objective.lastEmission >= 0.1:
-            #
-            #     objective.lastEmission = time.time()
             objective.Draw(screen)
 
         ## UPDATING PLAYER ##
@@ -324,7 +323,7 @@ class Game:
         ## HANDLE COLLISIONS ##
         colHandler.Update(newcol)
         ## UPDATE PARTICLES ##
-        particleHandler.Update(screen, colliders, dt)
+
 
         keys = pygame.key.get_pressed()
         # Player Controls
