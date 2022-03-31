@@ -292,7 +292,7 @@ class Game:
 
         for hazard in hazards:
             hazard.Update(objects + [player])
-            hazard.Draw(screen)
+            #hazard.Draw(screen)
 
         ## UPDATING OBJECTIVES ##
         for obstacle in obstacles:

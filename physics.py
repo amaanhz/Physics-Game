@@ -534,7 +534,7 @@ class PhysObject:
 
 class Player(PhysObject):
     def __init__(self, pos, image, mass, fuel, thrust, weightlessfuel=False):
-        super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT)
+        super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT, 0.2)
         self.fuel, self.tank = fuel, fuel
         self.weightlessfuel = weightlessfuel
         self.bodymass = mass
