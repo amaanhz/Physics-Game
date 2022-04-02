@@ -230,6 +230,8 @@ class Game:
         self.particleHandler = ParticleHandler()
         self.timer = Timer((0,0))
     def DrawHUD(self):
+        self.timer.Draw()
+
         font = pygame.font.Font(None, 30)
         #render_fps = font.render(str(int(clock.get_fps())), True, WHITE)
         #screen.blit(render_fps, (0, 0))
@@ -285,7 +287,6 @@ class Game:
 
         screen.blit(background_image, tuple(self.lPos))
 
-        self.timer.Draw()
         self.DrawHUD()
 
         particleHandler.Update(screen, colliders + [player], dt)
