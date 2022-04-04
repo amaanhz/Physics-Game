@@ -78,9 +78,9 @@ def touching(obj1, obj2):
     checkx = (rect2.left <= rect1.right and rect2.right >= rect1.left)
     if rect1.left == rect2.right and checky:
         return "left"
-    if rect1.right == rect2.left and checkx:
+    if rect1.right == rect2.left and checky:
         return "right"
-    if rect1.top == rect2.bottom and checky:
+    if rect1.top == rect2.bottom and checkx:
         return "top"
     if rect1.bottom == rect2.top and checkx:
         return "bottom"
@@ -483,6 +483,9 @@ class PhysObject:
         bounceAxis = CollisionHandler.SafeMove(self, tempcolliders, delta)
 
         if bounceAxis["x"]:
+            if isinstance(self, Player):
+                if abs(self.velocity.x) >= 10:
+                    self.collisions += 1
             if self.COR > 0:
                 bounce = abs(self.velocity.x) * self.COR
                 if bounce > 1:
@@ -493,6 +496,9 @@ class PhysObject:
                 self.velocity.x = 0
 
         if bounceAxis["y"]:
+            if isinstance(self, Player):
+                if abs(self.velocity.y) >= 10:
+                    self.collisions += 1
             if self.COR > 0:
                 bounce = abs(self.velocity.y) * self.COR
                 if bounce > 1:
@@ -501,6 +507,7 @@ class PhysObject:
                     self.velocity.y = 0
             else:
                 self.velocity.y = 0
+
     def SetVelocity(self, vx, vy):
         self.velocity = Vec2(vx, vy)
     def SetVelocityVec2(self, v2):
@@ -540,12 +547,14 @@ class Player(PhysObject):
         self.bodymass = mass
         self.mass = self.bodymass + self.fuel if not weightlessfuel else self.bodymass
         self.thrust = thrust
+        self.collisions = 0
     def Update(self, colliders, dt):
         if not self.weightlessfuel:
             self.mass = self.bodymass + self.fuel
         super().Update(colliders, dt)
         if self.fuel <= 1:
             self.RemoveForce(self, "Drive")
+        print(self.collisions)
     def Thrust(self, particleHandler, reverse=False):
         if self.fuel >= 1:
             base = Vec2(0, self.thrust)
@@ -832,8 +841,10 @@ class Objective(WorldCollider):
         for trigger in self.triggers:
             if trigger.GetRect().colliderect(self.rect) or touching(trigger, self):
                 self.colour = GREEN
+                self.complete = True
                 return True
         self.colour = self.original
+        self.complete = False
         return False
     def Draw(self, screen):
         pygame.draw.rect(screen, self.colour, self.rect)

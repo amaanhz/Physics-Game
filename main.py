@@ -123,6 +123,24 @@ def level_load(level):
 
     return info
 
+class Timer:
+    def __init__(self, pos, active=True):
+        self.pos = pos
+        self.epoch = time.time()
+        self.formattedTime = ""
+        self.elapsed = 0
+        self.active = active
+    def Update(self):
+        if self.active:
+            self.elapsed = time.time() - self.epoch
+            minutes = int(self.elapsed // 60)
+            secondsRemaining = int(self.elapsed - minutes * 60)
+            self.formattedTime = f"{'0' if minutes < 10 else ''}{str(minutes)}:{'0' if secondsRemaining < 10 else ''}{str(secondsRemaining)}"
+    def Draw(self):
+        render_time = hudFont.render(self.formattedTime, True, WHITE)
+        screen.blit(render_time, self.pos)
+    def GetTime(self):
+        return self.elapsed
 
 class State:
     def __init__(self, newstate):
@@ -148,6 +166,8 @@ class MenuButton:
         screen.blit(self.buttonText, self.buttonTextRect)
     def collide(self, mousePos):
         return self.buttonRect.collidepoint(mousePos)
+
+
 
 class Menu:
     def __init__(self, stateobj):
@@ -189,26 +209,26 @@ class Menu:
                 pygame.quit()
                 sys.exit()
 
-class Timer:
-    def __init__(self, pos, active=True):
-        self.pos = pos
-        self.epoch = time.time()
-        self.formattedTime = ""
-        self.elapsed = 0
-        self.active = active
-    def Update(self):
-        if self.active:
-            self.elapsed = time.time() - self.epoch
-            minutes = int(self.elapsed // 60)
-            secondsRemaining = int(self.elapsed - minutes * 60)
-            self.formattedTime = f"{'0' if minutes < 10 else ''}{str(minutes)}:{'0' if secondsRemaining < 10 else ''}{str(secondsRemaining)}"
-    def Draw(self):
-        render_time = hudFont.render(self.formattedTime, True, WHITE)
-        screen.blit(render_time, self.pos)
+class ScoringScreen:
+    def __init__(self, stateobj, objectives, optimal, time, collisions):
+        self.state = stateobj
+        self.totalobj = len(objectives)
+        self.objmet = len([x for x in objectives if x.complete])
+        self.optimal = optimal
+        self.time = time
+        self.collisions = collisions
 
+        timeDiff = optimal - time # This will be negative if the player took longer than the optimal
+        timeMult = min(abs(timeDiff) / optimal, 1) # Only penalise/bonus for up to double the time and down to 0 seconds
+        timeMult *= -1 if timeDiff < 0 else 1 # Bonus or penalty
+        self.score = int(SCOREBASE + ((SCOREBASE // 2)*timeMult) - (HITPENALTY * collisions))
+
+    def RunFrame(self, dt):
+        print(self.score)
+        self.state.newstate(Menu(self.state))
 
 class Game:
-    def __init__(self, stateobj, background, world, objects, player, objectives, obstacles, hazards):
+    def __init__(self, stateobj, background, world, objects, player, objectives, obstacles, hazards, optimal=30):
         self.state = stateobj
         self.background_image = pygame.image.load(background).convert_alpha()
         self.level_size = self.background_image.get_size()
@@ -229,6 +249,8 @@ class Game:
         self.colHandler = CollisionHandler(self.level_size)
         self.particleHandler = ParticleHandler()
         self.timer = Timer((0,0))
+        self.optimal = optimal
+
     def DrawHUD(self):
         self.timer.Draw()
 
@@ -296,13 +318,20 @@ class Game:
             #hazard.Draw(screen)
 
         ## UPDATING OBJECTIVES ##
-        for obstacle in obstacles:
-            obstacle.Update(player)
-            obstacle.Draw(screen)
-
+        completed = True
         for objective in objectives:
             objective.Update()
+            if not objective.complete:
+                completed = False
             objective.Draw(screen)
+        if completed:
+            self.state.newstate(ScoringScreen(self.state, objectives, self.optimal, self.timer.GetTime(), player.collisions))
+
+
+        for obstacle in obstacles:
+            if obstacle.Update(player):
+                self.state.newstate(Menu(self.state))
+            obstacle.Draw(screen)
 
         ## UPDATING PLAYER ##
         player.Update(colliders, dt)
