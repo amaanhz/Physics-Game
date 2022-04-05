@@ -52,6 +52,7 @@ def getCameraTrack(player, lpos, lwidth, lheight):
 
 def level_load(level):
     ## All level info stored as a dictionary
+    level = str(level)
     info = {
         "background": os.path.join("levels", level, "background.png"),
         "world": [],
@@ -61,7 +62,6 @@ def level_load(level):
         "hazards": [],
         "player": None
     }
-
     ## LOADING WORLD COLLIDERS ##
     with open(os.path.join("levels", level, "world.csv"), "r") as file:
         reader = csv.reader(file)
@@ -91,11 +91,10 @@ def level_load(level):
         for row in reader:
             if row[0] == "PLAYER":
                 objInfo = list(map(int, row[1:]))
-                info["objectives"] = info["objectives"] + [PlayerObjective(Vec2(objInfo[0], objInfo[1]), objInfo[2], objInfo[3], info["player"])]
+                info["objectives"] = info["objectives"] + [PlayerObjective(Vec2(objInfo[0], objInfo[1]), objInfo[2], objInfo[3])]
             elif row[0] == "PHYS":
                 objInfo = list(map(int, row[1:]))
-                info["objectives"] = info["objectives"] + [PhysObjective(Vec2(objInfo[0], objInfo[1]), objInfo[2], objInfo[3],
-                                                                           [x for x in info["objects"] if isinstance(x, KeyObject)])]
+                info["objectives"] = info["objectives"] + [PhysObjective(Vec2(objInfo[0], objInfo[1]), objInfo[2], objInfo[3])]
             elif row[0] == "OBJECT":
                 pos = tuple(map(int, row[1:3]))
                 conv = list(map(float, row[4:]))
@@ -122,6 +121,13 @@ def level_load(level):
 
 
     return info
+
+def gameInit(levelnum, stateobj):
+    gameData = level_load(levelnum)
+    background, world, objects, objectives, obstacles, hazards, player = gameData["background"], gameData[
+        "world"], gameData["objects"], gameData["objectives"], gameData["obstacles"], gameData["hazards"], \
+                                                                         gameData["player"]
+    return Game(stateobj, background, world, objects, player, objectives, obstacles, hazards, levelnum)
 
 class Timer:
     def __init__(self, pos, active=True):
@@ -151,10 +157,10 @@ class State:
         self.state.RunFrame(dt)
 
 class MenuButton:
-    def __init__(self, text, pos):
+    def __init__(self, text, pos, width=swidth/2, height=50):
         self.text = text
         self.buttonText = mediumMenu.render(text, True, BLACK)
-        self.buttonRect = pygame.Rect(pos[0], pos[1], swidth / 2, 50)
+        self.buttonRect = pygame.Rect(pos[0], pos[1], width, height)
         self.buttonTextRect = self.buttonText.get_rect()
         self.buttonTextRect.center = self.buttonRect.center
     def Draw(self):
@@ -166,7 +172,6 @@ class MenuButton:
         screen.blit(self.buttonText, self.buttonTextRect)
     def collide(self, mousePos):
         return self.buttonRect.collidepoint(mousePos)
-
 
 
 class Menu:
@@ -196,10 +201,7 @@ class Menu:
 
         if click:
             if self.buttonList[0].collide(mousePos):
-                gameData = level_load(DEBUG_LEVEL)
-                background, world, objects, objectives, obstacles, hazards, player = gameData["background"], gameData["world"], \
-                    gameData["objects"], gameData["objectives"], gameData["obstacles"], gameData["hazards"], gameData["player"]
-                self.state.newstate(Game(self.state, background, world, objects, player, objectives, obstacles, hazards))
+                self.state.newstate(gameInit(DEBUG_LEVEL, self.state))
             elif self.buttonList[2].collide(mousePos):
                 pygame.quit()
                 sys.exit()
@@ -210,25 +212,57 @@ class Menu:
                 sys.exit()
 
 class ScoringScreen:
-    def __init__(self, stateobj, objectives, optimal, time, collisions):
+    def __init__(self, stateobj, objectives, timer, collisions, levelnum):
         self.state = stateobj
         self.totalobj = len(objectives)
         self.objmet = len([x for x in objectives if x.complete])
-        self.optimal = optimal
-        self.time = time
+        self.optimal = OPTIMALS[levelnum]
+        self.time = timer
         self.collisions = collisions
+        self.levelnum = levelnum
+        self.background_image = pygame.image.load("assets/background/background.png").convert()
 
-        timeDiff = optimal - time # This will be negative if the player took longer than the optimal
-        timeMult = min(abs(timeDiff) / optimal, 1) # Only penalise/bonus for up to double the time and down to 0 seconds
+        timeDiff = self.optimal - timer # This will be negative if the player took longer than the optimal
+        timeMult = min(abs(timeDiff) / self.optimal, 1) # Only penalise/bonus for up to double the time and down to 0 seconds
         timeMult *= -1 if timeDiff < 0 else 1 # Bonus or penalty
-        self.score = int(SCOREBASE + ((SCOREBASE // 2)*timeMult) - (HITPENALTY * collisions))
+        self.score = int(SCOREBASE + (SCOREBASE*timeMult) - (HITPENALTY * collisions))
+        self.score = 1 if self.score == 0 else self.score
+
+        self.buttonList = [MenuButton("Replay", (swidth/5, sheight * (3/5)), swidth/4),
+                           MenuButton("Next Level", (swidth/5, sheight * (3/5) + 60), swidth/4)]
+
 
     def RunFrame(self, dt):
-        print(self.score)
-        self.state.newstate(Menu(self.state))
+        screen.blit(self.background_image, (0, 0))
+
+        title = largeBoldMenu.render("Score", True, ORANGE)
+        titleRect = title.get_rect()
+        titleRect.center = ((swidth / 2), 100)
+        screen.blit(title, titleRect)
+
+        for button in self.buttonList:
+            button.Draw()
+
+        click, _, _ = pygame.mouse.get_pressed()
+        mousePos = pygame.mouse.get_pos()
+
+        if click:
+            if self.buttonList[0].collide(mousePos):
+                self.state.newstate(gameInit(self.levelnum, self.state))
+            elif self.buttonList[1].collide(mousePos):
+                pass
+            elif self.buttonList[2].collide(mousePos):
+                self.state.newstate(Menu(self.state))
+
+
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+
 
 class Game:
-    def __init__(self, stateobj, background, world, objects, player, objectives, obstacles, hazards, optimal=30):
+    def __init__(self, stateobj, background, world, objects, player, objectives, obstacles, hazards, levelnum):
         self.state = stateobj
         self.background_image = pygame.image.load(background).convert_alpha()
         self.level_size = self.background_image.get_size()
@@ -249,7 +283,7 @@ class Game:
         self.colHandler = CollisionHandler(self.level_size)
         self.particleHandler = ParticleHandler()
         self.timer = Timer((0,0))
-        self.optimal = optimal
+        self.levelnum = levelnum
 
     def DrawHUD(self):
         self.timer.Draw()
@@ -320,12 +354,13 @@ class Game:
         ## UPDATING OBJECTIVES ##
         completed = True
         for objective in objectives:
-            objective.Update()
+            objective.Update([player] if isinstance(objective, PlayerObjective)
+                             else [x for x in objects if isinstance(x, KeyObject)])
             if not objective.complete:
                 completed = False
             objective.Draw(screen)
         if completed:
-            self.state.newstate(ScoringScreen(self.state, objectives, self.optimal, self.timer.GetTime(), player.collisions))
+            self.state.newstate(ScoringScreen(self.state, objectives, self.timer.GetTime(), player.collisions, self.levelnum))
 
 
         for obstacle in obstacles:

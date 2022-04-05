@@ -831,14 +831,13 @@ class ParticleHandler:
             self.Add(EngineParticle(ship.engine, uv, random.uniform(0.5, 0.8)))
 
 class Objective(WorldCollider):
-    def __init__(self, pos, width, height, triggers, material="Asphalt"):
+    def __init__(self, pos, width, height, material="Asphalt"):
         super().__init__(pygame.Rect(pos.x, pos.y, width, height), material)
         self.original, self.colour = GREY, GREY
-        self.triggers = triggers
         self.complete = False
         self.lastEmission = time.time()
-    def Update(self):
-        for trigger in self.triggers:
+    def Update(self, triggers):
+        for trigger in triggers:
             if trigger.GetRect().colliderect(self.rect) or touching(trigger, self):
                 self.colour = GREEN
                 self.complete = True
@@ -852,13 +851,13 @@ class Objective(WorldCollider):
         return self.rect
 
 class PlayerObjective(Objective):
-    def __init__(self, pos, width, height, player):
-        super().__init__(pos, width, height, [player])
+    def __init__(self, pos, width, height):
+        super().__init__(pos, width, height)
         self.original, self.colour = YELLOW, YELLOW
 
 class PhysObjective(Objective):
-    def __init__(self, pos, width, height, obj):
-        super().__init__(pos, width, height, obj)
+    def __init__(self, pos, width, height):
+        super().__init__(pos, width, height)
         self.original, self.colour = MAGENTA, MAGENTA
 
 class Obstacle(WorldCollider):

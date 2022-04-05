@@ -1,7 +1,7 @@
 import pygame, math, os
 
 DEBUG = False
-DEBUG_LEVEL = "1"
+DEBUG_LEVEL = 1
 
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
@@ -46,3 +46,7 @@ METRE = player_image.get_height() * (1 / 1.7)
 
 SCOREBASE = 10000
 HITPENALTY = 500
+
+OPTIMALS = {
+    1: 30
+}
