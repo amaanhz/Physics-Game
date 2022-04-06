@@ -227,11 +227,10 @@ class ScoringScreen:
         timeMult *= -1 if timeDiff < 0 else 1 # Bonus or penalty
         self.score = int(SCOREBASE + (SCOREBASE*timeMult) - (HITPENALTY * collisions))
         self.score = 1 if self.score == 0 else self.score
-
-        self.buttonList = [MenuButton("Replay", (swidth/5, sheight * (3/5)), swidth/4),
-                           MenuButton("Next Level", (swidth/5, sheight * (3/5) + 60), swidth/4)]
-
-
+        print(self.score)
+        self.buttonList = [MenuButton("Replay", (swidth/5, sheight * (3/5)), swidth/4)]
+        if len(OPTIMALS) >= levelnum + 1:
+            self.buttonList.append(MenuButton("Next Level", (swidth/5, sheight * (3/5) + 60), swidth/4))
     def RunFrame(self, dt):
         screen.blit(self.background_image, (0, 0))
 
@@ -251,6 +250,7 @@ class ScoringScreen:
                 self.state.newstate(gameInit(self.levelnum, self.state))
             elif self.buttonList[1].collide(mousePos):
                 pass
+
             elif self.buttonList[2].collide(mousePos):
                 self.state.newstate(Menu(self.state))
 
