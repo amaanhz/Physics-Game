@@ -5,6 +5,8 @@ import os, csv
 largeBoldMenu = pygame.font.Font(QUALY, 100)
 slightlylargeBold = pygame.font.Font(EXO, 75)
 mediumText = pygame.font.Font(EXO, 50)
+mediumSmallText = pygame.font.Font(EXO, 30)
+smallText = pygame.font.Font(EXO, 20)
 mediumMenu = pygame.font.Font(EXO, 28)
 hudFont = pygame.font.Font(UNISPACE, 30)
 
@@ -131,6 +133,12 @@ def gameInit(levelnum, stateobj):
                                                                          gameData["player"]
     return Game(stateobj, background, world, objects, player, objectives, obstacles, hazards, levelnum)
 
+def textRender(font, pos, text, colour):
+    rendered = font.render(text, True, colour)
+    rect = rendered.get_rect()
+    rect.center = pos
+    screen.blit(rendered, rect)
+
 class Timer:
     def __init__(self, pos, active=True):
         self.pos = pos
@@ -170,15 +178,19 @@ class MenuButton:
         self.buttonRect = pygame.Rect(pos[0], pos[1], width, height)
         self.buttonTextRect = self.buttonText.get_rect()
         self.buttonTextRect.center = self.buttonRect.center
+        self.enabled = True
     def Draw(self):
-        if self.buttonRect.collidepoint(pygame.mouse.get_pos()):
-            pygame.draw.rect(screen, NEARLYBLACK, self.buttonRect, 0, 7)
-        else:
-            pygame.draw.rect(screen, GREY, self.buttonRect, 0, 7)
-        pygame.draw.rect(screen, BLACK, self.buttonRect, 3, 7)
-        screen.blit(self.buttonText, self.buttonTextRect)
+        if self.enabled:
+            if self.buttonRect.collidepoint(pygame.mouse.get_pos()):
+                pygame.draw.rect(screen, NEARLYBLACK, self.buttonRect, 0, 7)
+            else:
+                pygame.draw.rect(screen, GREY, self.buttonRect, 0, 7)
+            pygame.draw.rect(screen, BLACK, self.buttonRect, 3, 7)
+            screen.blit(self.buttonText, self.buttonTextRect)
     def collide(self, mousePos):
         return self.buttonRect.collidepoint(mousePos)
+    def setEnabled(self, val):
+        self.enabled = val
 
 
 class Menu:
@@ -193,12 +205,9 @@ class Menu:
         newpos = ((swidth / 4), (2 / 5 * sheight) + 60 * len(self.buttonList))
         self.buttonList.append(MenuButton(text, newpos))
     def RunFrame(self, dt):
-        screen.blit(self.background_image, (0, 0))
+        screen.fill(BACKGROUNDCOLOUR)
 
-        title = largeBoldMenu.render("PhysX", True, ORANGE)
-        titleRect = title.get_rect()
-        titleRect.center = ((swidth / 2), 100)
-        screen.blit(title, titleRect)
+        textRender(largeBoldMenu, ((swidth / 2), 100), "PhysX", ORANGE)
 
         for button in self.buttonList:
             button.Draw()
@@ -234,38 +243,34 @@ class ScoringScreen:
             timeMult = min(abs(timeDiff) / self.optimal, 1) # Only penalise/bonus for up to double the time and down to 0 seconds
             timeMult *= -1 if timeDiff < 0 else 1 # Bonus or penalty
             self.score = int(SCOREBASE + (SCOREBASE*timeMult) - (HITPENALTY * collisions))
-            self.score = 1 if self.score == 0 else self.score
+            self.score = 1 if self.score <= 0 else self.score
         else:
             self.score = 0
 
         self.buttonList = [MenuButton("Replay", (swidth/5, sheight * (3/5)), swidth/4),
                            MenuButton("Next Level", (swidth/5, sheight * (3/5) + 60), swidth/4),
-                           MenuButton("Main Menu", (swidth * (3/5), sheight * (3/5)), swidth/4)]
+                           MenuButton("Main Menu", (swidth * (3/5), sheight * (3/5)), swidth/4),
+                           MenuButton("Save Score", (swidth * (3/5), sheight * (3/5) + 60), swidth/4)]
+        if len(OPTIMALS) < levelnum + 1:
+            self.buttonList[1].setEnabled(False)
+        if self.score <= 0:
+            self.buttonList[3].setEnabled(False)
+
 
     def detailRender(self, detail, value, colour):
-        detailText = mediumText.render(f"{detail}: {str(value)}", True, colour)
-        detailRect = detailText.get_rect()
-        detailRect.center = ((swidth / 2), 220 + (self.detailnum * 60))
-        screen.blit(detailText, detailRect)
+        textRender(mediumText, ((swidth / 2), 220 + (self.detailnum * 60)), f"{detail}: {str(value)}", colour)
         self.detailnum += 1
 
     def RunFrame(self, dt):
-        screen.blit(self.background_image, (0, 0))
-
-        title = slightlylargeBold.render(f"Score: {str(self.score)}", True, WHITE)
-        titleRect = title.get_rect()
-        titleRect.center = ((swidth / 2), 100)
-        screen.blit(title, titleRect)
+        screen.fill(BACKGROUNDCOLOUR)
+        textRender(slightlylargeBold, ((swidth / 2), 100), f"Score: {str(self.score)}", WHITE)
 
         self.detailnum = 0
 
         colour = WHITE
         if self.objmet < self.totalobj:
             colour = RED
-        detailText = mediumText.render(f"Objectives Met: {str(self.objmet)}/{str(self.totalobj)}", True, colour)
-        detailRect = detailText.get_rect()
-        detailRect.center = ((swidth / 2), 220 + (self.detailnum * 60))
-        screen.blit(detailText, detailRect)
+        textRender(mediumText, ((swidth / 2), 220 + (self.detailnum * 60)), f"Objectives Met: {str(self.objmet)}/{str(self.totalobj)}", colour)
         self.detailnum += 1
 
         colour = WHITE
@@ -279,10 +284,8 @@ class ScoringScreen:
         colour = WHITE
         if self.collisions > 0:
             colour = RED
-        detailText = mediumText.render(f"Damaging Collisions: {str(self.collisions)} ({str(-1 * self.collisions * HITPENALTY)})", True, colour)
-        detailRect = detailText.get_rect()
-        detailRect.center = ((swidth / 2), 220 + (self.detailnum * 60))
-        screen.blit(detailText, detailRect)
+        textRender(mediumText, ((swidth / 2), 220 + (self.detailnum * 60)),
+                   f"Damaging Collisions: {str(self.collisions)} ({str(-1 * self.collisions * HITPENALTY)})", colour)
         self.detailnum += 1
 
 
@@ -299,9 +302,67 @@ class ScoringScreen:
                 self.state.newstate(gameInit(self.levelnum + 1, self.state))
             elif self.buttonList[2].collide(mousePos):
                 self.state.newstate(Menu(self.state))
-
+            elif self.buttonList[3].collide(mousePos) and self.score > 0:
+                self.state.newstate(SaveScore(self.state, self.score, self.levelnum))
 
         for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+
+class SaveScore:
+    def __init__(self, stateobj, score, levelnum):
+        self.state = stateobj
+        self.score = score
+        self.level = levelnum
+        self.text = ''
+        self.error = ''
+    def filterName(self):
+        if len(self.text) >= 40:
+            self.error = "This username is too long. It must be less than 40 characters."
+            return False
+        if len(self.text) == 0:
+            self.error = "Please enter a name."
+            return False
+        if not self.text[0].isalpha():
+            self.error = "The first character of the name must be alphabetic."
+            return False
+        self.error = ""
+        return True
+
+    def recordScore(self, user, score):
+        pass
+
+    def RunFrame(self, dt):
+        screen.fill(BACKGROUNDCOLOUR)
+
+        textRender(slightlylargeBold, ((swidth / 2), 100), f"Score: {str(self.score)}", WHITE)
+
+        inputBoxWidth = swidth * (4/5)
+        inputBoxHeight = 80
+        inputBox = pygame.Rect((swidth/2) - (inputBoxWidth/2), (sheight/2) - (inputBoxHeight/2), inputBoxWidth, inputBoxHeight)
+        pygame.draw.rect(screen, WHITE, inputBox)
+
+        textRender(mediumText, tuple(Vec2(inputBox.center) - Vec2(0, 100)), "Enter a username:", WHITE)
+
+        textRender(mediumSmallText, inputBox.center, self.text, BLACK)
+
+        if len(self.error) > 0:
+            textRender(smallText, tuple(Vec2(inputBox.center) + Vec2(0, 100)), self.error, RED)
+
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    if self.filterName():
+                        print(self.text)
+                        self.state.newstate(Menu(self.state))
+                elif event.key == pygame.K_BACKSPACE:
+                    self.text = self.text[:-1] if self.text != '' else ''
+                elif event.key == pygame.K_SPACE:
+                    pass
+                else:
+                    if len(self.text) <= 40:
+                        self.text += event.unicode
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
@@ -439,9 +500,9 @@ class Game:
         keys = pygame.key.get_pressed()
         # Player Controls
         if keys[pygame.K_RIGHT]:
-            player.Rotate(1, colliders)
+            player.Rotate(1, colliders, dt)
         if keys[pygame.K_LEFT]:
-            player.Rotate(-1, colliders)
+            player.Rotate(-1, colliders, dt)
         if keys[pygame.K_SPACE]:
             player.Thrust(particleHandler)
 

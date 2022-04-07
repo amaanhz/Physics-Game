@@ -440,11 +440,11 @@ class PhysObject:
         self.pos = p
     def GetRect(self):
         return self.rect
-    def Rotate(self, scale, colliders):
+    def Rotate(self, scale, colliders, dt):
         if len(touchingany(self, colliders)) == 0:
             old_rect = copy.deepcopy(self.rect)
             scale *= -1 # We want to interpret + rotation as clockwise
-            self.angle += PLAYER_ROTATION_SPEED * scale
+            self.angle += PLAYER_ROTATION_SPEED * scale * dt
             rotated_image = pygame.transform.rotate(self.image_clean, self.angle)
             self.image = rotated_image
             self.rect = self.image.get_rect(center=old_rect.center)
@@ -480,10 +480,10 @@ class PhysObject:
         tempcolliders = [x for x in colliders if isinstance(x, WorldCollider)]
         delta = self.velocity * dt * METRE
 
-        bounceAxis = CollisionHandler.SafeMove(self, tempcolliders, delta)
+        colData = CollisionHandler.SafeMove(self, tempcolliders, delta)
 
-        if bounceAxis["x"]:
-            if isinstance(self, Player):
+        if colData["x"]:
+            if isinstance(self, Player) and not isinstance(colData["objectX"], PhysObject):
                 if abs(self.velocity.x) >= 10:
                     self.collisions += 1
             if self.COR > 0:
@@ -495,8 +495,8 @@ class PhysObject:
             else:
                 self.velocity.x = 0
 
-        if bounceAxis["y"]:
-            if isinstance(self, Player):
+        if colData["y"]:
+            if isinstance(self, Player) and not isinstance(colData["objectY"], PhysObject):
                 if abs(self.velocity.y) >= 10:
                     self.collisions += 1
             if self.COR > 0:
@@ -507,7 +507,6 @@ class PhysObject:
                     self.velocity.y = 0
             else:
                 self.velocity.y = 0
-
     def SetVelocity(self, vx, vy):
         self.velocity = Vec2(vx, vy)
     def SetVelocityVec2(self, v2):
@@ -678,7 +677,9 @@ class CollisionHandler:
     @staticmethod
     def SafeMove(object, colliders, delta):
         returnVals = {"x": False,
-                      "y": False}
+                      "y": False,
+                      "objectX": None,
+                      "objectY": None}
 
         ## HANDLE X MOVEMENT ##
         oldRect = copy.deepcopy(object.GetRect())
@@ -701,6 +702,7 @@ class CollisionHandler:
                 object.pos = Vec2(object.rect.center)
 
             returnVals["x"] = True
+            returnVals["objectX"] = entity
 
         ###########################################
 
@@ -722,6 +724,7 @@ class CollisionHandler:
                     object.pos = Vec2(object.rect.center)
 
                 returnVals["y"] = True
+                returnVals["objectY"] = entity
 
         return returnVals
 

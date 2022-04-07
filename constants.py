@@ -13,6 +13,7 @@ GREY = (119, 119, 119)
 NEARLYBLACK = (61, 61, 61)
 MAGENTA = (181, 49, 201)
 STEEL = (159, 161, 163)
+BACKGROUNDCOLOUR = (36, 35, 35)
 
 OPTIMUS = os.path.join("assets", "fonts", "Optimus.otf")
 OPTIMUS_BOLD = os.path.join("assets", "fonts", "Optimus_Bold.otf")
@@ -22,10 +23,10 @@ QUINGER = os.path.join("assets", "fonts", "Quinger.ttf")
 QUALY = os.path.join("assets", "fonts", "Qualy Bold.ttf")
 EXO = os.path.join("assets", "fonts", "Exo2-Regular.otf")
 
-WINDOW_SIZE = (1280, 720)
+WINDOW_SIZE = (1600, 900)
 WINDOW_CENTRE = (WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 2)
 swidth, sheight = WINDOW_SIZE
-FPS = 100
+FPS = 200
 
 screen = pygame.display.set_mode(WINDOW_SIZE, 0, 32)
 
@@ -39,7 +40,7 @@ GRAVITY = 15
 AIR_DENSITY = 1.2041
 PLAYER_DRAG_COEFFICIENT = 1.15
 SPHERE_DRAG_COEFFICIENT = 0.5
-PLAYER_ROTATION_SPEED = 1
+PLAYER_ROTATION_SPEED = 75
 
 AIRSTREAM_PARTICLENUM = 50
 
