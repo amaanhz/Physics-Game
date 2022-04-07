@@ -18,8 +18,9 @@ OPTIMUS = os.path.join("assets", "fonts", "Optimus.otf")
 OPTIMUS_BOLD = os.path.join("assets", "fonts", "Optimus_Bold.otf")
 FUTURE_LIGHT = os.path.join("assets", "fonts", "Future_Light.ttf")
 UNISPACE = os.path.join("assets", "fonts", "unispace_rg.ttf")
-
-
+QUINGER = os.path.join("assets", "fonts", "Quinger.ttf")
+QUALY = os.path.join("assets", "fonts", "Qualy Bold.ttf")
+EXO = os.path.join("assets", "fonts", "Exo2-Regular.otf")
 
 WINDOW_SIZE = (1280, 720)
 WINDOW_CENTRE = (WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 2)
@@ -48,5 +49,5 @@ SCOREBASE = 10000
 HITPENALTY = 500
 
 OPTIMALS = {
-    1: 30
+    1: 15
 }

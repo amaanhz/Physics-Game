@@ -2,8 +2,10 @@ from physics import *
 from constants import *
 import os, csv
 
-largeBoldMenu = pygame.font.Font(FUTURE_LIGHT, 100)
-mediumMenu = pygame.font.Font(OPTIMUS, 28)
+largeBoldMenu = pygame.font.Font(QUALY, 100)
+slightlylargeBold = pygame.font.Font(EXO, 75)
+mediumText = pygame.font.Font(EXO, 50)
+mediumMenu = pygame.font.Font(EXO, 28)
 hudFont = pygame.font.Font(UNISPACE, 30)
 
 def getCameraTrack(player, lpos, lwidth, lheight):
@@ -100,7 +102,7 @@ def level_load(level):
                 conv = list(map(float, row[4:]))
                 colour = tuple(conv[1:4])
                 info["objects"] = info["objects"] + [KeyObject(pos, pygame.image.load(row[3]).convert_alpha(), conv[0],
-                                                               colour, conv[-1], conv[-2])]
+                                                               colour, conv[-2], conv[-1])]
 
     ## LOADING OBSTACLES ##
     with open(os.path.join("levels", level, "obstacles.csv"), "r") as file:
@@ -142,6 +144,11 @@ class Timer:
             minutes = int(self.elapsed // 60)
             secondsRemaining = int(self.elapsed - minutes * 60)
             self.formattedTime = f"{'0' if minutes < 10 else ''}{str(minutes)}:{'0' if secondsRemaining < 10 else ''}{str(secondsRemaining)}"
+    @staticmethod
+    def formatTime(sec):
+        minutes = int(sec // 60)
+        secondsRemaining = int(sec - minutes * 60)
+        return f"{'0' if minutes < 10 else ''}{str(minutes)}:{'0' if secondsRemaining < 10 else ''}{str(secondsRemaining)}"
     def Draw(self):
         render_time = hudFont.render(self.formattedTime, True, WHITE)
         screen.blit(render_time, self.pos)
@@ -188,7 +195,7 @@ class Menu:
     def RunFrame(self, dt):
         screen.blit(self.background_image, (0, 0))
 
-        title = largeBoldMenu.render("Main Menu", True, ORANGE)
+        title = largeBoldMenu.render("PhysX", True, ORANGE)
         titleRect = title.get_rect()
         titleRect.center = ((swidth / 2), 100)
         screen.blit(title, titleRect)
@@ -217,27 +224,67 @@ class ScoringScreen:
         self.totalobj = len(objectives)
         self.objmet = len([x for x in objectives if x.complete])
         self.optimal = OPTIMALS[levelnum]
-        self.time = timer
+        self.time = int(timer)
         self.collisions = collisions
         self.levelnum = levelnum
         self.background_image = pygame.image.load("assets/background/background.png").convert()
 
-        timeDiff = self.optimal - timer # This will be negative if the player took longer than the optimal
-        timeMult = min(abs(timeDiff) / self.optimal, 1) # Only penalise/bonus for up to double the time and down to 0 seconds
-        timeMult *= -1 if timeDiff < 0 else 1 # Bonus or penalty
-        self.score = int(SCOREBASE + (SCOREBASE*timeMult) - (HITPENALTY * collisions))
-        self.score = 1 if self.score == 0 else self.score
-        print(self.score)
-        self.buttonList = [MenuButton("Replay", (swidth/5, sheight * (3/5)), swidth/4)]
-        if len(OPTIMALS) >= levelnum + 1:
-            self.buttonList.append(MenuButton("Next Level", (swidth/5, sheight * (3/5) + 60), swidth/4))
+        if self.objmet == self.totalobj: # if the player succeeded
+            timeDiff = self.optimal - timer # This will be negative if the player took longer than the optimal
+            timeMult = min(abs(timeDiff) / self.optimal, 1) # Only penalise/bonus for up to double the time and down to 0 seconds
+            timeMult *= -1 if timeDiff < 0 else 1 # Bonus or penalty
+            self.score = int(SCOREBASE + (SCOREBASE*timeMult) - (HITPENALTY * collisions))
+            self.score = 1 if self.score == 0 else self.score
+        else:
+            self.score = 0
+
+        self.buttonList = [MenuButton("Replay", (swidth/5, sheight * (3/5)), swidth/4),
+                           MenuButton("Next Level", (swidth/5, sheight * (3/5) + 60), swidth/4),
+                           MenuButton("Main Menu", (swidth * (3/5), sheight * (3/5)), swidth/4)]
+
+    def detailRender(self, detail, value, colour):
+        detailText = mediumText.render(f"{detail}: {str(value)}", True, colour)
+        detailRect = detailText.get_rect()
+        detailRect.center = ((swidth / 2), 220 + (self.detailnum * 60))
+        screen.blit(detailText, detailRect)
+        self.detailnum += 1
+
     def RunFrame(self, dt):
         screen.blit(self.background_image, (0, 0))
 
-        title = largeBoldMenu.render("Score", True, ORANGE)
+        title = slightlylargeBold.render(f"Score: {str(self.score)}", True, WHITE)
         titleRect = title.get_rect()
         titleRect.center = ((swidth / 2), 100)
         screen.blit(title, titleRect)
+
+        self.detailnum = 0
+
+        colour = WHITE
+        if self.objmet < self.totalobj:
+            colour = RED
+        detailText = mediumText.render(f"Objectives Met: {str(self.objmet)}/{str(self.totalobj)}", True, colour)
+        detailRect = detailText.get_rect()
+        detailRect.center = ((swidth / 2), 220 + (self.detailnum * 60))
+        screen.blit(detailText, detailRect)
+        self.detailnum += 1
+
+        colour = WHITE
+        if self.time < self.optimal:
+            colour = GREEN
+        elif self.time > self.optimal:
+            colour = RED
+        self.detailRender("Time", Timer.formatTime(self.time), colour)
+
+
+        colour = WHITE
+        if self.collisions > 0:
+            colour = RED
+        detailText = mediumText.render(f"Damaging Collisions: {str(self.collisions)} ({str(-1 * self.collisions * HITPENALTY)})", True, colour)
+        detailRect = detailText.get_rect()
+        detailRect.center = ((swidth / 2), 220 + (self.detailnum * 60))
+        screen.blit(detailText, detailRect)
+        self.detailnum += 1
+
 
         for button in self.buttonList:
             button.Draw()
@@ -248,9 +295,8 @@ class ScoringScreen:
         if click:
             if self.buttonList[0].collide(mousePos):
                 self.state.newstate(gameInit(self.levelnum, self.state))
-            elif self.buttonList[1].collide(mousePos):
-                pass
-
+            elif self.buttonList[1].collide(mousePos) and len(OPTIMALS) >= self.levelnum + 1:
+                self.state.newstate(gameInit(self.levelnum + 1, self.state))
             elif self.buttonList[2].collide(mousePos):
                 self.state.newstate(Menu(self.state))
 
@@ -365,7 +411,7 @@ class Game:
 
         for obstacle in obstacles:
             if obstacle.Update(player):
-                self.state.newstate(Menu(self.state))
+                self.state.newstate(ScoringScreen(self.state, objectives, self.timer.GetTime(), player.collisions, self.levelnum))
             obstacle.Draw(screen)
 
         ## UPDATING PLAYER ##
@@ -399,8 +445,8 @@ class Game:
         if keys[pygame.K_SPACE]:
             player.Thrust(particleHandler)
 
-        elif keys[pygame.K_LSHIFT]:
-            player.Thrust(particleHandler, True)
+        #elif keys[pygame.K_LSHIFT]:
+        #    player.Thrust(particleHandler, True)
 
         if keys[pygame.K_MINUS]:
             self.lPos[0] = self.lPos[0] - 1
