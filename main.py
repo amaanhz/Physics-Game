@@ -198,6 +198,7 @@ class Menu:
         self.state = stateobj
         self.buttonList = []
         self.DrawButton("Play Game")
+        self.DrawButton("Level Select")
         self.DrawButton("Leaderboards")
         self.DrawButton("Quit")
         self.background_image = pygame.image.load("assets/background/background.png").convert()
@@ -208,7 +209,6 @@ class Menu:
         screen.fill(BACKGROUNDCOLOUR)
 
         textRender(largeBoldMenu, ((swidth / 2), 100), "PhysX", ORANGE)
-
         for button in self.buttonList:
             button.Draw()
 
@@ -218,7 +218,11 @@ class Menu:
         if click:
             if self.buttonList[0].collide(mousePos):
                 self.state.newstate(gameInit(DEBUG_LEVEL, self.state))
-            elif self.buttonList[2].collide(mousePos):
+            if self.buttonList[1].collide(mousePos):
+                self.state.newstate(LevelSelect(self.state, True))
+            if self.buttonList[2].collide(mousePos):
+                self.state.newstate(LevelSelect(self.state, False))
+            elif self.buttonList[3].collide(mousePos):
                 pygame.quit()
                 sys.exit()
 
@@ -255,12 +259,9 @@ class ScoringScreen:
             self.buttonList[1].setEnabled(False)
         if self.score <= 0:
             self.buttonList[3].setEnabled(False)
-
-
     def detailRender(self, detail, value, colour):
         textRender(mediumText, ((swidth / 2), 220 + (self.detailnum * 60)), f"{detail}: {str(value)}", colour)
         self.detailnum += 1
-
     def RunFrame(self, dt):
         screen.fill(BACKGROUNDCOLOUR)
         textRender(slightlylargeBold, ((swidth / 2), 100), f"Score: {str(self.score)}", WHITE)
@@ -329,7 +330,6 @@ class SaveScore:
             return False
         self.error = ""
         return True
-
     def recordScore(self):
         board = []
         presenceCheck = open(os.path.join("scores", f"{self.level}.csv"), "a")
@@ -344,23 +344,31 @@ class SaveScore:
         if len(board) == 0:
             board.append(newScore)
         else:
+            names = [x[0] for x in board]
+            i = None
+            if self.text in names:
+                i = names.index(self.text)
+            if i is not None and int(board[i][1]) < self.score:
+                board = board[:i] + board[i+1:]
             for i, row in enumerate(board):
                 row[1] = int(row[1])
                 if i == 0 and newScore[1] >= row[1]: # In case the new score is higher than the highest score
                     board = [newScore] + board
+                    break
                 if i != len(board) - 1:
                     if row[1] >= newScore[1] and int(board[i+1][1]) <= newScore[1]:
                         temp = board[i+1:] # copy the board items ahead of where we want to insert
                         board = board[:i+1] # remove those items from the board
                         board.append(newScore)
                         board = board + temp
+                        break
                 else:
                     board.append(newScore)
+                    break
 
         with open(os.path.join("scores", f"{self.level}.csv"), "w", newline='') as file:
             writer = csv.writer(file)
             writer.writerows(board)
-
     def RunFrame(self, dt):
         screen.fill(BACKGROUNDCOLOUR)
 
@@ -391,6 +399,78 @@ class SaveScore:
                 else:
                     if len(self.text) <= 40:
                         self.text += event.unicode
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+
+class Leaderboard:
+    def __init__(self, stateobj, levelnum):
+        self.scores = []
+        with open(os.path.join("scores", f"{levelnum}.csv"), "r", newline='') as file:
+            reader = csv.reader(file)
+            for row in reader:
+                self.scores.append(row)
+    def RunFrame(self, dt):
+        screen.fill(BACKGROUNDCOLOUR)
+
+        heightget = mediumSmallText.size("c")[1]
+        x = swidth / 2
+        sliceHeight = sheight / 10
+        for i in range(0, min(len(self.scores), 10)):
+            textRender(mediumSmallText, (x, (sliceHeight * i) + (heightget / 2)), f"{i+1}. {self.scores[i][0]}     {self.scores[i][1]}",
+                       WHITE)
+
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+
+class LevelSelect:
+    def __init__(self, stateobj, game):
+        self.state = stateobj
+        self.game = game
+        self.levels = os.listdir("levels")
+        self.levels.sort(key=lambda x: int(x))
+        self.splitLevels = []
+
+        sliceWidth = swidth / 11
+        sliceHeight = sheight / 7
+
+        # Split the list of levels into sections of 5
+        fullRows = len(self.levels) // 5
+        for i in range(fullRows):
+            insert = i * 5
+            self.splitLevels.append(self.levels[insert:insert+5])
+        self.splitLevels.append(self.levels[fullRows * 5:(fullRows * 5)+len(self.levels) % 5])
+        print(self.splitLevels)
+
+        self.backButton = MenuButton("<", (20, 20), swidth/8, 50)
+        self.buttonList = []
+        for i, row in enumerate(self.splitLevels):
+            #sequence is 2n+1
+            y = (2 * i + 1) * sliceHeight
+            for i, level in enumerate(row):
+                x = (2 * i + 1) * sliceWidth
+                self.buttonList.append(MenuButton(level, (x, y), sliceWidth, sliceHeight))
+
+    def RunFrame(self, dt):
+        screen.fill(BACKGROUNDCOLOUR)
+
+        for button in self.buttonList:
+            button.Draw()
+        self.backButton.Draw()
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mousePos = pygame.mouse.get_pos()
+                for button in self.buttonList:
+                    if button.collide(mousePos):
+                        if self.game:
+                            self.state.newstate(gameInit(button.text, self.state))
+                        else:
+                            self.state.newstate(Leaderboard(self.state, button.text))
+                if self.backButton.collide(mousePos):
+                    self.state.newstate(Menu(self.state))
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
