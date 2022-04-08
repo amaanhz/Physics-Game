@@ -330,8 +330,36 @@ class SaveScore:
         self.error = ""
         return True
 
-    def recordScore(self, user, score):
-        pass
+    def recordScore(self):
+        board = []
+        presenceCheck = open(os.path.join("scores", f"{self.level}.csv"), "a")
+        presenceCheck.close()
+
+        with open(os.path.join("scores", f"{self.level}.csv"), "r", newline='') as file:
+            reader = csv.reader(file)
+            for row in reader:
+                board.append(row)
+
+        newScore = [self.text, self.score]
+        if len(board) == 0:
+            board.append(newScore)
+        else:
+            for i, row in enumerate(board):
+                row[1] = int(row[1])
+                if i == 0 and newScore[1] >= row[1]: # In case the new score is higher than the highest score
+                    board = [newScore] + board
+                if i != len(board) - 1:
+                    if row[1] >= newScore[1] and int(board[i+1][1]) <= newScore[1]:
+                        temp = board[i+1:] # copy the board items ahead of where we want to insert
+                        board = board[:i+1] # remove those items from the board
+                        board.append(newScore)
+                        board = board + temp
+                else:
+                    board.append(newScore)
+
+        with open(os.path.join("scores", f"{self.level}.csv"), "w", newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(board)
 
     def RunFrame(self, dt):
         screen.fill(BACKGROUNDCOLOUR)
@@ -354,7 +382,7 @@ class SaveScore:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
                     if self.filterName():
-                        print(self.text)
+                        self.recordScore()
                         self.state.newstate(Menu(self.state))
                 elif event.key == pygame.K_BACKSPACE:
                     self.text = self.text[:-1] if self.text != '' else ''
