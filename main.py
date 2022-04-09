@@ -319,8 +319,8 @@ class SaveScore:
         self.text = ''
         self.error = ''
     def filterName(self):
-        if len(self.text) >= 10:
-            self.error = "This username is too long. It must be less than 10 characters."
+        if len(self.text) >= MAXUSERNAMECHARS:
+            self.error = f"This username is too long. It must be less than {MAXUSERNAMECHARS} characters."
             return False
         if len(self.text) == 0:
             self.error = "Please enter a name."
@@ -427,10 +427,12 @@ class Leaderboard:
         itemNum = 0
         for i in range(0 + (10 * self.scroll), min(len(self.scores), 0 + (10 * self.scroll) + 10)):
             stringStart = f"{i+1}. {self.scores[i][0]}"
-            strin = stringStart + ((24 - len(stringStart)) * " ") + str(self.scores[i][1])
+            strin = stringStart + ((28 - len(stringStart)) * " ") + str(self.scores[i][1])
+
+            colour = YELLOW if i == 0 else WHITE
 
             textRender(hudFont, (x, (sliceHeight * itemNum) + (heightget / 2)), strin,
-                       WHITE)
+                       colour)
             itemNum += 1
 
         textRender(mediumText, (swidth * (2/11), sheight / 2), "LEADERBOARD", ORANGE)

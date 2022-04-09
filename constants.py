@@ -23,7 +23,7 @@ QUINGER = os.path.join("assets", "fonts", "Quinger.ttf")
 QUALY = os.path.join("assets", "fonts", "Qualy Bold.ttf")
 EXO = os.path.join("assets", "fonts", "Exo2-Regular.otf")
 
-WINDOW_SIZE = (1600, 900)
+WINDOW_SIZE = (1920, 1080)
 WINDOW_CENTRE = (WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 2)
 swidth, sheight = WINDOW_SIZE
 FPS = 200
@@ -48,6 +48,8 @@ METRE = player_image.get_height() * (1 / 1.7)
 
 SCOREBASE = 10000
 HITPENALTY = 500
+
+MAXUSERNAMECHARS = 15
 
 OPTIMALS = {
     1: 15
