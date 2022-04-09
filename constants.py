@@ -13,7 +13,7 @@ GREY = (119, 119, 119)
 NEARLYBLACK = (61, 61, 61)
 MAGENTA = (181, 49, 201)
 STEEL = (159, 161, 163)
-BACKGROUNDCOLOUR = (36, 35, 35)
+BACKGROUNDCOLOUR = (16, 15, 15)
 
 OPTIMUS = os.path.join("assets", "fonts", "Optimus.otf")
 OPTIMUS_BOLD = os.path.join("assets", "fonts", "Optimus_Bold.otf")

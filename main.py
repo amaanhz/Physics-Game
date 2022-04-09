@@ -319,8 +319,8 @@ class SaveScore:
         self.text = ''
         self.error = ''
     def filterName(self):
-        if len(self.text) >= 40:
-            self.error = "This username is too long. It must be less than 40 characters."
+        if len(self.text) >= 10:
+            self.error = "This username is too long. It must be less than 10 characters."
             return False
         if len(self.text) == 0:
             self.error = "Please enter a name."
@@ -405,22 +405,50 @@ class SaveScore:
 
 class Leaderboard:
     def __init__(self, stateobj, levelnum):
+        self.state = stateobj
         self.scores = []
+        self.level = levelnum
         with open(os.path.join("scores", f"{levelnum}.csv"), "r", newline='') as file:
             reader = csv.reader(file)
             for row in reader:
                 self.scores.append(row)
+        self.scroll = 0
+        self.backButton = MenuButton("<", (20, 20), swidth / 8, 50)
     def RunFrame(self, dt):
         screen.fill(BACKGROUNDCOLOUR)
 
         heightget = mediumSmallText.size("c")[1]
         x = swidth / 2
         sliceHeight = sheight / 10
-        for i in range(0, min(len(self.scores), 10)):
-            textRender(mediumSmallText, (x, (sliceHeight * i) + (heightget / 2)), f"{i+1}. {self.scores[i][0]}     {self.scores[i][1]}",
+
+        maxPages =  len(self.scores) // 10
+
+
+        itemNum = 0
+        for i in range(0 + (10 * self.scroll), min(len(self.scores), 0 + (10 * self.scroll) + 10)):
+            stringStart = f"{i+1}. {self.scores[i][0]}"
+            strin = stringStart + ((24 - len(stringStart)) * " ") + str(self.scores[i][1])
+
+            textRender(hudFont, (x, (sliceHeight * itemNum) + (heightget / 2)), strin,
                        WHITE)
+            itemNum += 1
+
+        textRender(mediumText, (swidth * (2/11), sheight / 2), "LEADERBOARD", ORANGE)
+        textRender(mediumText, (swidth * (2 / 11), (sheight / 2) - 60), f"LEVEL {self.level}", ORANGE)
+        textRender(mediumSmallText, (swidth * (9/11), sheight / 2), "Use the arrow keys to scroll", ORANGE)
+
+        self.backButton.Draw()
 
         for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mousePos = pygame.mouse.get_pos()
+                if self.backButton.collide(mousePos):
+                    self.state.newstate(LevelSelect(self.state, False))
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_DOWN:
+                    self.scroll += 1 if self.scroll != maxPages else 0
+                elif event.key == pygame.K_UP:
+                    self.scroll += -1 if self.scroll != 0 else 0
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
