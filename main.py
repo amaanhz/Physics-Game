@@ -207,8 +207,13 @@ class Menu:
         titleRect = largeBoldMenu.render("PhysX", True, ORANGE).get_rect()
         titleRect.center = ((swidth / 2), 100)
         self.world.append(WorldCollider(titleRect, "Steel"))
+        self.world.append(WorldCollider(pygame.Rect(-1, 0, 1, sheight)))
+        self.world.append(WorldCollider(pygame.Rect(0, -1, swidth, 1)))
+        self.world.append(WorldCollider(pygame.Rect(swidth, 0, 1, sheight)))
+        self.world.append(WorldCollider(pygame.Rect(0, sheight, swidth, 1)))
         self.objects = []
         self.colhandler = CollisionHandler((swidth, sheight))
+
     def DrawButton(self, text):
         newpos = ((swidth / 4), (2 / 5 * sheight) + 60 * len(self.buttonList))
         self.buttonList.append(MenuButton(text, newpos))
@@ -247,15 +252,16 @@ class Menu:
                         pygame.quit()
                         sys.exit()
                 elif event.button == 3:
-                    inside = False
-                    for wc in self.world:
-                        if wc.GetRect().collidepoint(mousePos):
-                            inside = True
-                    if not inside:
-                        balls = [ball_image_orange, ball_image_white]
-                        ball = PhysObject(mousePos, random.choice(balls), 30, COR=0.4)
-                        ball.SetVelocity(random.randint(-20, 20), random.randint(-10, 0))
-                        self.objects.append(ball)
+                    if len(self.objects) < 10:
+                        inside = False
+                        for wc in self.world:
+                            if wc.GetRect().collidepoint(mousePos):
+                                inside = True
+                        if not inside:
+                            balls = [ball_image_orange, ball_image_white]
+                            ball = PhysObject(mousePos, random.choice(balls), 30, COR=0.4)
+                            ball.SetVelocity(random.randint(-20, 20), random.randint(-10, 0))
+                            self.objects.append(ball)
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
