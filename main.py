@@ -702,7 +702,9 @@ class Game:
                 pygame.quit()
                 sys.exit()
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_g:
+                if event.key == pygame.K_ESCAPE:
+                    self.state.newstate(Menu(self.state))
+                if event.key == pygame.K_g and DEBUG:
                     for object in [player] + objects:
                         object.SetWeightless(False if object.weightless else True)
             if event.type == pygame.KEYUP:  # Cleaning up drive forces
