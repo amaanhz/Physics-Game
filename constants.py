@@ -5,6 +5,7 @@ DEBUG_LEVEL = 1
 
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
+PINK = (204, 33, 64)
 GREEN = (28, 214, 59)
 YELLOW = (255, 255, 0)
 BLACK = (0, 0, 0)
@@ -23,7 +24,7 @@ QUINGER = os.path.join("assets", "fonts", "Quinger.ttf")
 QUALY = os.path.join("assets", "fonts", "Qualy Bold.ttf")
 EXO = os.path.join("assets", "fonts", "Exo2-Regular.otf")
 
-WINDOW_SIZE = (1920, 1080)
+WINDOW_SIZE = (1600, 900)
 WINDOW_CENTRE = (WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 2)
 swidth, sheight = WINDOW_SIZE
 FPS = 200
@@ -32,6 +33,8 @@ screen = pygame.display.set_mode(WINDOW_SIZE, 0, 32)
 
 player_image = pygame.image.load("assets/sprites/character.png").convert_alpha()
 ball_image = pygame.image.load("assets/sprites/ball.png").convert_alpha()
+ball_image_white = pygame.image.load("assets/sprites/ball_white.png").convert_alpha()
+ball_image_orange = pygame.image.load("assets/sprites/ball_orange.png").convert_alpha()
 
 RAD = math.pi / 180
 
@@ -52,5 +55,6 @@ HITPENALTY = 500
 MAXUSERNAMECHARS = 15
 
 OPTIMALS = {
-    1: 15
+    "1": 15,
+    "2": 20
 }

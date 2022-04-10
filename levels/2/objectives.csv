@@ -1,0 +1,4 @@
+OBJECT,736,474,assets/sprites/ball_orange.png,75,247,160,20,0.5,0.4
+OBJECT,1184,474,assets/sprites/cube_teal.png,75,23,183,197,1,0.15
+PHYS,355,2398,365,27
+PHYS,1200,2398,365,27

@@ -45,6 +45,27 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\levels\2\objectives.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\levels\2\objects.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\levels\2\world.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\scores\1.csv">
           <value>
             <Attribute>

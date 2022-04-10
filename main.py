@@ -182,15 +182,17 @@ class MenuButton:
     def Draw(self):
         if self.enabled:
             if self.buttonRect.collidepoint(pygame.mouse.get_pos()):
-                pygame.draw.rect(screen, NEARLYBLACK, self.buttonRect, 0, 7)
-            else:
                 pygame.draw.rect(screen, GREY, self.buttonRect, 0, 7)
+            else:
+                pygame.draw.rect(screen, NEARLYBLACK, self.buttonRect, 0, 7)
             pygame.draw.rect(screen, BLACK, self.buttonRect, 3, 7)
             screen.blit(self.buttonText, self.buttonTextRect)
     def collide(self, mousePos):
         return self.buttonRect.collidepoint(mousePos)
     def setEnabled(self, val):
         self.enabled = val
+    def GetRect(self):
+        return self.buttonRect
 
 
 class Menu:
@@ -201,7 +203,12 @@ class Menu:
         self.DrawButton("Level Select")
         self.DrawButton("Leaderboards")
         self.DrawButton("Quit")
-        self.background_image = pygame.image.load("assets/background/background.png").convert()
+        self.world = [WorldCollider(x.GetRect(), "Steel") for x in self.buttonList]
+        titleRect = largeBoldMenu.render("PhysX", True, ORANGE).get_rect()
+        titleRect.center = ((swidth / 2), 100)
+        self.world.append(WorldCollider(titleRect, "Steel"))
+        self.objects = []
+        self.colhandler = CollisionHandler((swidth, sheight))
     def DrawButton(self, text):
         newpos = ((swidth / 4), (2 / 5 * sheight) + 60 * len(self.buttonList))
         self.buttonList.append(MenuButton(text, newpos))
@@ -212,21 +219,43 @@ class Menu:
         for button in self.buttonList:
             button.Draw()
 
-        click, _, _ = pygame.mouse.get_pressed()
+        if DEBUG:
+            for wc in self.world:
+                wc.DrawDebug()
+
+        for i, obj in enumerate(self.objects):
+            colliders = [x for x in self.objects if x != obj] + self.world
+            obj.Update(colliders, dt)
+            obj.Draw(screen)
+            if not Rect(0, 0, swidth, sheight).contains(obj.GetRect()):
+                self.objects.pop(i)
+
+        self.colhandler.Update(self.objects)
+
         mousePos = pygame.mouse.get_pos()
 
-        if click:
-            if self.buttonList[0].collide(mousePos):
-                self.state.newstate(gameInit(DEBUG_LEVEL, self.state))
-            if self.buttonList[1].collide(mousePos):
-                self.state.newstate(LevelSelect(self.state, True))
-            if self.buttonList[2].collide(mousePos):
-                self.state.newstate(LevelSelect(self.state, False))
-            elif self.buttonList[3].collide(mousePos):
-                pygame.quit()
-                sys.exit()
-
         for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    if self.buttonList[0].collide(mousePos):
+                        self.state.newstate(gameInit(DEBUG_LEVEL, self.state))
+                    if self.buttonList[1].collide(mousePos):
+                        self.state.newstate(LevelSelect(self.state, True))
+                    if self.buttonList[2].collide(mousePos):
+                        self.state.newstate(LevelSelect(self.state, False))
+                    elif self.buttonList[3].collide(mousePos):
+                        pygame.quit()
+                        sys.exit()
+                elif event.button == 3:
+                    inside = False
+                    for wc in self.world:
+                        if wc.GetRect().collidepoint(mousePos):
+                            inside = True
+                    if not inside:
+                        balls = [ball_image_orange, ball_image_white]
+                        ball = PhysObject(mousePos, random.choice(balls), 30, COR=0.4)
+                        ball.SetVelocity(random.randint(-20, 20), random.randint(-10, 0))
+                        self.objects.append(ball)
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
@@ -236,10 +265,10 @@ class ScoringScreen:
         self.state = stateobj
         self.totalobj = len(objectives)
         self.objmet = len([x for x in objectives if x.complete])
-        self.optimal = OPTIMALS[levelnum]
+        self.optimal = OPTIMALS[str(levelnum)]
         self.time = int(timer)
         self.collisions = collisions
-        self.levelnum = levelnum
+        self.levelnum = int(levelnum)
         self.background_image = pygame.image.load("assets/background/background.png").convert()
 
         if self.objmet == self.totalobj: # if the player succeeded
@@ -255,7 +284,7 @@ class ScoringScreen:
                            MenuButton("Next Level", (swidth/5, sheight * (3/5) + 60), swidth/4),
                            MenuButton("Main Menu", (swidth * (3/5), sheight * (3/5)), swidth/4),
                            MenuButton("Save Score", (swidth * (3/5), sheight * (3/5) + 60), swidth/4)]
-        if len(OPTIMALS) < levelnum + 1:
+        if len(OPTIMALS) < self.levelnum + 1:
             self.buttonList[1].setEnabled(False)
         if self.score <= 0:
             self.buttonList[3].setEnabled(False)
@@ -304,7 +333,7 @@ class ScoringScreen:
             elif self.buttonList[2].collide(mousePos):
                 self.state.newstate(Menu(self.state))
             elif self.buttonList[3].collide(mousePos) and self.score > 0:
-                self.state.newstate(SaveScore(self.state, self.score, self.levelnum))
+                self.state.newstate(SaveScore(self.state, self.score, self.levelnum, self))
 
         for event in pygame.event.get():
             if event.type == QUIT:
@@ -312,10 +341,12 @@ class ScoringScreen:
                 sys.exit()
 
 class SaveScore:
-    def __init__(self, stateobj, score, levelnum):
+    def __init__(self, stateobj, score, levelnum, scoringScreen):
         self.state = stateobj
         self.score = score
         self.level = levelnum
+        self.scoringScreen = scoringScreen
+        self.backButton = MenuButton("<", (20, 20), swidth / 8, 50)
         self.text = ''
         self.error = ''
     def filterName(self):
@@ -371,6 +402,7 @@ class SaveScore:
             writer.writerows(board)
     def RunFrame(self, dt):
         screen.fill(BACKGROUNDCOLOUR)
+        self.backButton.Draw()
 
         textRender(slightlylargeBold, ((swidth / 2), 100), f"Score: {str(self.score)}", WHITE)
 
@@ -387,6 +419,9 @@ class SaveScore:
             textRender(smallText, tuple(Vec2(inputBox.center) + Vec2(0, 100)), self.error, RED)
 
         for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if self.backButton.collide(pygame.mouse.get_pos()):
+                    self.state.newstate(self.scoringScreen)
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
                     if self.filterName():
@@ -408,6 +443,8 @@ class Leaderboard:
         self.state = stateobj
         self.scores = []
         self.level = levelnum
+        presenceCheck = open(os.path.join("scores", f"{levelnum}.csv"), "a", newline='')
+        presenceCheck.close()
         with open(os.path.join("scores", f"{levelnum}.csv"), "r", newline='') as file:
             reader = csv.reader(file)
             for row in reader:
@@ -417,11 +454,12 @@ class Leaderboard:
     def RunFrame(self, dt):
         screen.fill(BACKGROUNDCOLOUR)
 
-        heightget = mediumSmallText.size("c")[1]
         x = swidth / 2
+
+        heightget = hudFont.size("c")[1]
         sliceHeight = sheight / 10
 
-        maxPages =  len(self.scores) // 10
+        maxPages = len(self.scores) // 10
 
 
         itemNum = 0
@@ -435,9 +473,9 @@ class Leaderboard:
                        colour)
             itemNum += 1
 
-        textRender(mediumText, (swidth * (2/11), sheight / 2), "LEADERBOARD", ORANGE)
-        textRender(mediumText, (swidth * (2 / 11), (sheight / 2) - 60), f"LEVEL {self.level}", ORANGE)
-        textRender(mediumSmallText, (swidth * (9/11), sheight / 2), "Use the arrow keys to scroll", ORANGE)
+        textRender(mediumText, (swidth * (2/12), sheight / 2), "LEADERBOARD", ORANGE)
+        textRender(mediumText, (swidth * (2/12), (sheight / 2) - 60), f"LEVEL {self.level}", ORANGE)
+        textRender(mediumSmallText, (swidth * (10/12), sheight / 2), "Use the arrow keys to scroll", ORANGE)
 
         self.backButton.Draw()
 
@@ -471,7 +509,8 @@ class LevelSelect:
         for i in range(fullRows):
             insert = i * 5
             self.splitLevels.append(self.levels[insert:insert+5])
-        self.splitLevels.append(self.levels[fullRows * 5:(fullRows * 5)+len(self.levels) % 5])
+        if len(self.levels) % 5 != 0:
+            self.splitLevels.append(self.levels[-(len(self.levels) % 5)::1])
         print(self.splitLevels)
 
         self.backButton = MenuButton("<", (20, 20), swidth/8, 50)

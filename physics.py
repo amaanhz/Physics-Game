@@ -861,7 +861,7 @@ class PlayerObjective(Objective):
 class PhysObjective(Objective):
     def __init__(self, pos, width, height):
         super().__init__(pos, width, height)
-        self.original, self.colour = MAGENTA, MAGENTA
+        self.original, self.colour = PINK, PINK
 
 class Obstacle(WorldCollider):
     def __init__(self, pos, width, height, player):
