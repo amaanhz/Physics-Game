@@ -430,37 +430,42 @@ class PhysObject:
         self.acceleration = Vec2(0, 0)
         self.velocity = Vec2(0, 0)
         self.momentum = Vec2(0, 0)
-        self.detailsMode = True
+        self.detailsMode = False
+    def DrawDetails(self, surface):
+        details = [
+            f"Mass: {self.mass} kg",
+            f"Velocity: ({str(round(self.velocity, 1))}) m/s",
+            f"Acceleration: ({str(round(self.acceleration, 1))}) m/s²",
+            f"Resultant Force: ({str(round(self.rForce, 1))}) N",
+            "Forces:"
+        ]
+        for force in self.forces.forces:
+            details.append(f"   {force.name}: ({str(round(force, 1))}) N")
+        if isinstance(self, Player):
+            details = [f"Engine Drive: {self.thrust} N"] + details
+        fontSize = tinyFont.size("a")
+        rectHeight = (len(details) * fontSize[1]) + 10
+        rectWidth = 200
+        detailsRect = pygame.Rect(0, 0, rectWidth, rectHeight)
+        detailsRect.left = self.rect.right
+        detailsRect.centery = self.rect.centery
+        pygame.draw.rect(surface, NEARLYBLACK, detailsRect, 0, 7)
+        pygame.draw.rect(surface, BLACK, detailsRect, 3, 7)
+        for i, detail in enumerate(details):
+            textRender(tinyFont, (detailsRect.topleft[0] + 8, detailsRect.topleft[1] + 4 + (fontSize[1] * i)), detail,
+                       WHITE, False)
     def Draw(self, surface):
         surface.blit(self.image, self.rect)
         if self.detailsMode:
-            details = [
-                f"Mass: ({self.mass}) kg",
-                f"Velocity: ({str(round(self.velocity, 1))}) m/s",
-                f"Acceleration: ({str(round(self.acceleration, 1))}) m/s²",
-                f"Resultant Force: ({str(round(self.rForce, 1))}) N",
-                "Forces:"
-            ]
-            for force in self.forces.forces:
-                details.append(f"   {force.name}: ({str(round(force, 1))}) N")
-            fontSize = tinyFont.size("a")
-            rectHeight = (len(details) * fontSize[1]) + 10
-            rectWidth = 200
-            detailsRect = pygame.Rect(0, 0, rectWidth, rectHeight)
-            detailsRect.left = self.rect.right
-            detailsRect.centery = self.rect.centery
-            pygame.draw.rect(screen, GREY, detailsRect, 0, 7)
-            pygame.draw.rect(screen, BLACK, detailsRect, 3, 7)
-            for i, detail in enumerate(details):
-                textRender(tinyFont, (detailsRect.topleft[0] + 8, detailsRect.topleft[1] + 4 + (fontSize[1] * i)), detail, WHITE, False)
+            self.DrawDetails(surface)
         if DEBUG:
-            pygame.draw.rect(screen, RED, self.rect, 1)
+            pygame.draw.rect(surface, RED, self.rect, 1)
             image_rect = self.image.get_rect()
             image_rect.center = self.rect.center
-            pygame.draw.rect(screen, YELLOW, image_rect, 1)
-            pygame.draw.circle(screen, RED, self.rect.center, 1)
+            pygame.draw.rect(surface, YELLOW, image_rect, 1)
+            pygame.draw.circle(surface, RED, self.rect.center, 1)
             #pygame.draw.circle(screen, RED, tuple(self.GetPos() - (self.GetAngleVec() * (Vec2(self.image.get_size()) / 2))), 1)
-            pygame.draw.circle(screen, RED, tuple(self.engine), 1)
+            pygame.draw.circle(surface, RED, tuple(self.engine), 1)
     def GetPos(self):
         return self.pos
     def GetCentre(self):
@@ -566,6 +571,8 @@ class PhysObject:
         for force in self.forces:
             print(f"{force}: {str(self.forces[force])}")
         print(f"Resultant force: {self.rForce}")
+    def ToggleDetails(self):
+        self.detailsMode = True if not self.detailsMode else False
 
 class Player(PhysObject):
     def __init__(self, pos, image, mass, fuel, thrust, weightlessfuel=False):

@@ -701,6 +701,9 @@ class Game:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.state.newstate(Menu(self.state))
+                if event.key == pygame.K_TAB:
+                    for obj in objects + [player]:
+                        obj.ToggleDetails()
                 if event.key == pygame.K_g and DEBUG:
                     for object in [player] + objects:
                         object.SetWeightless(False if object.weightless else True)
