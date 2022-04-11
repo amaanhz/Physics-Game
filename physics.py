@@ -7,6 +7,7 @@ from constants import *
 pygame.init()
 
 pygame.display.set_caption("Physics")
+tinyFont = pygame.font.Font(UNISPACE, 8)
 
 class Material:
     def __init__(self, static, kinetic):
@@ -113,7 +114,14 @@ def identity(n):
     else:
         return n
 
-
+def textRender(font, pos, text, colour, center=True):
+    rendered = font.render(text, True, colour)
+    rect = rendered.get_rect()
+    if center:
+        rect.center = pos
+    else:
+        rect.topleft = pos
+    screen.blit(rendered, rect)
 
 class Vec2:
     def __init__(self, *args):
@@ -422,8 +430,29 @@ class PhysObject:
         self.acceleration = Vec2(0, 0)
         self.velocity = Vec2(0, 0)
         self.momentum = Vec2(0, 0)
+        self.detailsMode = True
     def Draw(self, surface):
         surface.blit(self.image, self.rect)
+        if self.detailsMode:
+            details = [
+                f"Mass: ({self.mass}) kg",
+                f"Velocity: ({str(round(self.velocity, 1))}) m/s",
+                f"Acceleration: ({str(round(self.acceleration, 1))}) m/s²",
+                f"Resultant Force: ({str(round(self.rForce, 1))}) N",
+                "Forces:"
+            ]
+            for force in self.forces.forces:
+                details.append(f"   {force.name}: ({str(round(force, 1))}) N")
+            fontSize = tinyFont.size("a")
+            rectHeight = (len(details) * fontSize[1]) + 10
+            rectWidth = 200
+            detailsRect = pygame.Rect(0, 0, rectWidth, rectHeight)
+            detailsRect.left = self.rect.right
+            detailsRect.centery = self.rect.centery
+            pygame.draw.rect(screen, GREY, detailsRect, 0, 7)
+            pygame.draw.rect(screen, BLACK, detailsRect, 3, 7)
+            for i, detail in enumerate(details):
+                textRender(tinyFont, (detailsRect.topleft[0] + 8, detailsRect.topleft[1] + 4 + (fontSize[1] * i)), detail, WHITE, False)
         if DEBUG:
             pygame.draw.rect(screen, RED, self.rect, 1)
             image_rect = self.image.get_rect()

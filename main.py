@@ -9,6 +9,7 @@ mediumSmallText = pygame.font.Font(EXO, 30)
 smallText = pygame.font.Font(EXO, 20)
 mediumMenu = pygame.font.Font(EXO, 28)
 hudFont = pygame.font.Font(UNISPACE, 30)
+tinyFont = pygame.font.Font(UNISPACE, 8)
 
 def getCameraTrack(player, lpos, lwidth, lheight):
     """
@@ -133,11 +134,7 @@ def gameInit(levelnum, stateobj):
                                                                          gameData["player"]
     return Game(stateobj, background, world, objects, player, objectives, obstacles, hazards, levelnum)
 
-def textRender(font, pos, text, colour):
-    rendered = font.render(text, True, colour)
-    rect = rendered.get_rect()
-    rect.center = pos
-    screen.blit(rendered, rect)
+
 
 class Timer:
     def __init__(self, pos, active=True):
@@ -633,7 +630,6 @@ class Game:
 
         screen.blit(background_image, tuple(self.lPos))
 
-        self.DrawHUD()
 
         particleHandler.Update(screen, colliders + [player], dt)
 
@@ -672,6 +668,7 @@ class Game:
         if DEBUG:
             for collider in world:
                 collider.DrawDebug()
+        self.DrawHUD()
         ###############################
         newcol = [x for x in objects]
         newcol.append(player)
