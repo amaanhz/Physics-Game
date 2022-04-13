@@ -56,5 +56,6 @@ MAXUSERNAMECHARS = 15
 
 OPTIMALS = {
     "1": 15,
-    "2": 20
+    "2": 20,
+    "3": 30
 }

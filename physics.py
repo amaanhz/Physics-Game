@@ -7,7 +7,7 @@ from constants import *
 pygame.init()
 
 pygame.display.set_caption("Physics")
-tinyFont = pygame.font.Font(UNISPACE, 8)
+tinyFont = pygame.font.Font(UNISPACE, 9)
 
 class Material:
     def __init__(self, static, kinetic):
@@ -262,9 +262,11 @@ class ForceManager:
             if "Friction" not in force.name and force.name != "Air Resistance":
                 rForce += force
         return rForce
-    def Update(self, colliders, dt):
+    def Update(self, constants, colliders, dt):
         parent = self.parent
         v = parent.velocity
+
+        gravity, airdensity = constants["gravity"], constants["airdensity"]
 
         touching = touchingany(parent, colliders)
         touchingEnts = [x[0] for x in touching]
@@ -274,7 +276,7 @@ class ForceManager:
         ## REMOVE REDUNDANT FORCES FROM ENTITIES NOT IN CONTACT/NOT OURSELF OR NOT APPLICABLE ##
         for i, force in enumerate(self.forces):
             # Contact Check (applies to any force)
-            if force.source not in touchingEnts and force.source != self.parent and not isinstance(force.source, AirStream):
+            if force.source not in touchingEnts and force.source != self.parent and force.name != "Wind":
                 self.forces.pop(i)
 
             # Friction Check
@@ -288,7 +290,7 @@ class ForceManager:
 
         ## ADD WEIGHT FORCE IF IT DOESN'T EXIST ##
         if not parent.weightless and GRAVITYON:
-            self.AddForce(parent, "Weight", 0, parent.mass * GRAVITY)
+            self.AddForce(parent, "Weight", 0, parent.mass * gravity)
         if not GRAVITYON or parent.weightless:
             self.RemoveForce(parent, "Weight")
 
@@ -309,7 +311,7 @@ class ForceManager:
                 A = parent.rect.height / METRE
             else:
                 A = parent.rect.width / METRE
-            dragmag = v.GetSqrMag() * 0.5 * AIR_DENSITY * parent.Cd * A
+            dragmag = v.GetSqrMag() * 0.5 * airdensity * parent.Cd * A
             drag = v.GetNormalized().Inverse() * dragmag  # Turn drag magnitude into an opposite-facing vector to velocity
             parent.AddForce(parent, "Air Resistance", drag)
 
@@ -445,7 +447,7 @@ class PhysObject:
             details = [f"Engine Drive: {self.thrust} N"] + details
         fontSize = tinyFont.size("a")
         rectHeight = (len(details) * fontSize[1]) + 10
-        rectWidth = 200
+        rectWidth = 230
         detailsRect = pygame.Rect(0, 0, rectWidth, rectHeight)
         detailsRect.left = self.rect.right
         detailsRect.centery = self.rect.centery
@@ -483,13 +485,13 @@ class PhysObject:
             self.image = rotated_image
             self.rect = self.image.get_rect(center=old_rect.center)
             self.angleDir = Vec2(math.cos((90 + self.angle) * RAD), -math.sin((90 - self.angle) * RAD)).GetNormalized()
-    def Update(self, colliders, dt):
+    def Update(self, constants, colliders, dt):
         if DEBUG and isinstance(self, Player):
             print(type(self))
 
         self.engine = self.GetPos() + Vec2(self.halfheight * math.sin(self.angle * RAD), self.halfheight * math.cos(self.angle * RAD))
 
-        self.forces.Update(colliders, dt)
+        self.forces.Update(constants, colliders, dt)
         self.velocity += self.acceleration * dt
 
         if round(self.velocity.x, 1) == 0 and identity(self.velocity.x) != identity(self.rForce.x): # If velocity is basically 0, and velocity is opposing the direction of
@@ -583,13 +585,12 @@ class Player(PhysObject):
         self.mass = self.bodymass + self.fuel if not weightlessfuel else self.bodymass
         self.thrust = thrust
         self.collisions = 0
-    def Update(self, colliders, dt):
+    def Update(self, constants, colliders, dt):
         if not self.weightlessfuel:
             self.mass = self.bodymass + self.fuel
-        super().Update(colliders, dt)
+        super().Update(constants, colliders, dt)
         if self.fuel <= 1:
             self.RemoveForce(self, "Drive")
-        print(self.collisions)
     def Thrust(self, particleHandler, reverse=False):
         if self.fuel >= 1:
             base = Vec2(0, self.thrust)
@@ -785,9 +786,9 @@ class Particle:
         self.acceleration = Vec2(0, 0)
         self.colSim = colSim
         self.parent = parent
-    def Update(self, dt, colliders=None):
+    def Update(self, dt, gravity, colliders=None):
         self.elapsed += dt
-        self.acceleration = Vec2(0, GRAVITY if GRAVITYON and not self.weightless else 0)
+        self.acceleration = Vec2(0, gravity if GRAVITYON and not self.weightless else 0)
         self.velocity += self.acceleration * dt
         if self.colSim:
             if self.parent is not None and self.parent in colliders:
@@ -818,8 +819,8 @@ class EngineParticle(Particle):
         self.colSim = True
         self.colour = [255, 174, 0, 255]
         self.radius = 2
-    def Update(self, dt, colliders):
-        super().Update(dt, colliders)
+    def Update(self, dt, gravity, colliders):
+        super().Update(dt, gravity, colliders)
         if self.elapsed < self.timer:
             frac = self.elapsed / self.timer
             self.colour[1] = lINTerp(174, 255, frac)
@@ -831,9 +832,9 @@ class EngineParticle(Particle):
 class ParticleHandler:
     def __init__(self):
         self.particles = []
-    def Update(self, screen, world, dt):
+    def Update(self, screen, world, gravity, dt):
         for i, particle in enumerate(self.particles):
-            particle.Update(dt, world)
+            particle.Update(dt, gravity, world)
             if particle.elapsed >= particle.timer != 0:
                 self.particles.pop(i)
 
@@ -848,9 +849,10 @@ class ParticleHandler:
                     obj.lastEmission = now
             if type(obj) == AirStream:
                 if now - obj.lastEmission >= 0.1:
-                    velocity = obj.GetForce().GetNormalized() * 30 * (obj.GetForce().GetSqrMag() / (2000 ** 2))
-                    self.Emit(obj, WHITE, 8, velocity, True)
+                    velocity = obj.GetForce().GetNormalized() * 30
+                    self.Emit(obj, WHITE, 7, velocity, True, True, obj)
                     obj.lastEmission = now
+        print(len([x for x in self.particles if x.colSim]))
 
     def Emit(self, obj, colour, life, velocity, weightless=False, colSim=False, parent=None):
         pos, rect = tuple(obj.GetPos()), obj.GetRect()
@@ -861,7 +863,7 @@ class ParticleHandler:
         self.Add(Particle(Vec2(x, y), velocity, life, weightless, colour, 2, colSim, parent))
 
 
-    def Add(self, particle, parent=None):
+    def Add(self, particle):
         self.particles.append(particle)
     def CreateEngineParticles(self, ship, drive):
         for i in range(0, 10):
@@ -926,12 +928,12 @@ class AirStream(WorldCollider):
             if streamWidth > 0:
                 self.streamRect = pygame.Rect(*self.rect.topright, streamWidth, height)
             else:
-                self.streamRect = pygame.Rect(pos.x + streamWidth, pos.y, streamWidth, height)
+                self.streamRect = pygame.Rect(pos.x + streamWidth, pos.y, -streamWidth, height)
         else:
             if streamHeight > 0:
                 self.streamRect = pygame.Rect(*self.rect.bottomleft, width, streamHeight)
             else:
-                self.streamRect = pygame.Rect(pos.x, pos.y + streamHeight, width, streamHeight)
+                self.streamRect = pygame.Rect(pos.x, pos.y + streamHeight, width, -streamHeight)
 
     def Update(self, objects):
         for obj in objects:
@@ -946,7 +948,7 @@ class AirStream(WorldCollider):
     def Draw(self, screen):
         pygame.draw.rect(screen, self.colour, self.rect)
         if DEBUG:
-            pygame.draw.rect(screen, WHITE, self.streamRect, 1)
+            pygame.draw.rect(screen, RED, self.streamRect, 1)
     def GetForce(self):
         return self.force
 

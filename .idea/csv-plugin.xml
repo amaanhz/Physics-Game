@@ -3,6 +3,13 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
+        <entry key="\levels\1\constants.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\levels\1\hazards.csv">
           <value>
             <Attribute>
@@ -59,7 +66,21 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\levels\2\player.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\levels\2\world.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\levels\3\player.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

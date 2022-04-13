@@ -9,7 +9,6 @@ mediumSmallText = pygame.font.Font(EXO, 30)
 smallText = pygame.font.Font(EXO, 20)
 mediumMenu = pygame.font.Font(EXO, 28)
 hudFont = pygame.font.Font(UNISPACE, 30)
-tinyFont = pygame.font.Font(UNISPACE, 8)
 
 def getCameraTrack(player, lpos, lwidth, lheight):
     """
@@ -65,14 +64,19 @@ def level_load(level):
         "objectives": [],
         "obstacles": [],
         "hazards": [],
+        "constants": {"gravity": None, "airdensity": None},
         "player": None
     }
     ## LOADING WORLD COLLIDERS ##
     with open(os.path.join("levels", level, "world.csv"), "r") as file:
         reader = csv.reader(file)
         for row in reader:
-            objInfo = list(map(int, row)) # Convert all coordinate values for the rect into integers
-            info["world"] = info["world"] + [WorldCollider(pygame.Rect(objInfo[0], objInfo[1], objInfo[2], objInfo[3]))]
+            objInfo = list(map(int, row[0:4])) # Convert all coordinate values for the rect into integers
+            if len(row) == 5:
+                info["world"] = info["world"] + [
+                    WorldCollider(pygame.Rect(objInfo[0], objInfo[1], objInfo[2], objInfo[3]), objInfo[4])]
+            else:
+                info["world"] = info["world"] + [WorldCollider(pygame.Rect(objInfo[0], objInfo[1], objInfo[2], objInfo[3]))]
 
     ## LOADING PHYSICS OBJECTS (Regular) ##
     with open(os.path.join("levels", level, "objects.csv"), "r") as file:
@@ -124,15 +128,21 @@ def level_load(level):
             force = Vec2(objInfo[-2], objInfo[-1])
             info["hazards"] = info["hazards"] + [AirStream(pos, objInfo[2], objInfo[3], objInfo[4], objInfo[5], force)]
 
-
+    with open(os.path.join("levels", level, "constants.csv"), "r") as file:
+        reader = csv.reader(file)
+        temp = []
+        for row in reader:  # Convert all coordinate values for the rect into integers
+            temp.append(float(row[0]))
+        info["constants"]["gravity"] = temp[0]
+        info["constants"]["airdensity"] = temp[1]
     return info
 
 def gameInit(levelnum, stateobj):
     gameData = level_load(levelnum)
-    background, world, objects, objectives, obstacles, hazards, player = gameData["background"], gameData[
+    background, world, objects, objectives, obstacles, hazards, player, constants = gameData["background"], gameData[
         "world"], gameData["objects"], gameData["objectives"], gameData["obstacles"], gameData["hazards"], \
-                                                                         gameData["player"]
-    return Game(stateobj, background, world, objects, player, objectives, obstacles, hazards, levelnum)
+        gameData["player"], gameData["constants"]
+    return Game(stateobj, background, world, objects, player, objectives, obstacles, hazards, constants, levelnum)
 
 
 
@@ -227,7 +237,7 @@ class Menu:
 
         for i, obj in enumerate(self.objects):
             colliders = [x for x in self.objects if x != obj] + self.world
-            obj.Update(colliders, dt)
+            obj.Update({"gravity": 15, "airdensity": 1.2041}, colliders, dt)
             obj.Draw(screen)
             if not Rect(0, 0, swidth, sheight).contains(obj.GetRect()):
                 self.objects.pop(i)
@@ -549,7 +559,8 @@ class LevelSelect:
 
 
 class Game:
-    def __init__(self, stateobj, background, world, objects, player, objectives, obstacles, hazards, levelnum):
+    def __init__(self, stateobj, background, world, objects, player, objectives, obstacles, hazards, constants, levelnum):
+        self.constants = constants
         self.state = stateobj
         self.background_image = pygame.image.load(background).convert_alpha()
         self.level_size = self.background_image.get_size()
@@ -580,8 +591,8 @@ class Game:
         #screen.blit(render_fps, (0, 0))
         render_mousepos = font.render(str(pygame.mouse.get_pos()), True, WHITE)
         screen.blit(render_mousepos, (500, 0))
-        fuelBackgroundRect = pygame.Rect(0, 0, int(0.75 * swidth), int(0.03 * sheight))
-        fuelRect = pygame.Rect(0, 0, int(0.75 * swidth * self.player.fuel / self.player.tank), int(0.03 * sheight))
+        fuelBackgroundRect = pygame.Rect(0, 0, int(0.75 * swidth), int(0.01 * sheight))
+        fuelRect = pygame.Rect(0, 0, int(0.75 * swidth * self.player.fuel / self.player.tank), int(0.015 * sheight))
 
         fuelBackgroundRect.center, fuelRect.center = (swidth // 2, int(0.95 * sheight)), (swidth // 2, int(0.95 * sheight))
         pygame.draw.rect(screen, NEARLYBLACK, fuelBackgroundRect)
@@ -631,7 +642,7 @@ class Game:
         screen.blit(background_image, tuple(self.lPos))
 
 
-        particleHandler.Update(screen, colliders + [player], dt)
+        particleHandler.Update(screen, colliders + [player], self.constants["gravity"], dt)
 
         for hazard in hazards:
             hazard.Update(objects + [player])
@@ -655,14 +666,14 @@ class Game:
             obstacle.Draw(screen)
 
         ## UPDATING PLAYER ##
-        player.Update(colliders, dt)
+        player.Update(self.constants, colliders, dt)
         player.Draw(screen)
 
         ## UPDATING PHYSOBJECTS ##
         newcolliders = [x for x in world]
         newcolliders.append(player)
         for object in objects:
-            object.Update(newcolliders + [x for x in objects if x != object], dt)
+            object.Update(self.constants, newcolliders + [x for x in objects if x != object], dt)
             object.Draw(screen)
 
         if DEBUG:
@@ -686,8 +697,8 @@ class Game:
         if keys[pygame.K_SPACE]:
             player.Thrust(particleHandler)
 
-        #elif keys[pygame.K_LSHIFT]:
-        #    player.Thrust(particleHandler, True)
+        elif keys[pygame.K_LSHIFT]:
+            player.Thrust(particleHandler, True)
 
         if keys[pygame.K_MINUS]:
             self.lPos[0] = self.lPos[0] - 1
