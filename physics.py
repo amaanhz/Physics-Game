@@ -519,7 +519,8 @@ class PhysObject:
         colData = CollisionHandler.SafeMove(self, tempcolliders, delta)
 
         if colData["x"]:
-            if isinstance(self, Player) and not isinstance(colData["objectX"], PhysObject):
+            if isinstance(self, Player) and not (isinstance(colData["objectX"], PhysObject) or
+                                                 isinstance(colData["objectX"], Objective)):
                 if abs(self.velocity.x) >= 10:
                     self.collisions += 1
             if self.COR > 0:
@@ -532,7 +533,8 @@ class PhysObject:
                 self.velocity.x = 0
 
         if colData["y"]:
-            if isinstance(self, Player) and not isinstance(colData["objectY"], PhysObject):
+            if isinstance(self, Player) and not (isinstance(colData["objectY"], PhysObject) or
+                                                 isinstance(colData["objectY"], Objective)):
                 if abs(self.velocity.y) >= 10:
                     self.collisions += 1
             if self.COR > 0:
@@ -598,8 +600,7 @@ class Player(PhysObject):
             base.x, base.y = (base.x * math.cos(rads)) - (base.y * math.sin(rads)), \
                              -((base.x * math.sin(rads)) + (base.y * math.cos(rads)))
             if reverse:
-                base.x *= -1
-                base.y *= -1
+                base *= -1
             self.AddForce(self, "Drive", base)
             particleHandler.CreateEngineParticles(self, base)
             self.fuel -= 1
@@ -787,17 +788,24 @@ class Particle:
         self.colSim = colSim
         self.parent = parent
     def Update(self, dt, gravity, colliders=None):
+        world = [x for x in colliders]
         self.elapsed += dt
         self.acceleration = Vec2(0, gravity if GRAVITYON and not self.weightless else 0)
         self.velocity += self.acceleration * dt
         if self.colSim:
-            if self.parent is not None and self.parent in colliders:
-                colliders.remove(self.parent)
-            touch = CollisionHandler.SafeMove(self, colliders, self.velocity * dt * METRE)
+            if self.parent is not None and self.parent in world:
+                world.remove(self.parent)
+            touch = CollisionHandler.SafeMove(self, world, self.velocity * dt * METRE)
             if touch["x"]:
-                self.velocity.x *= -0.8
+                if isinstance(self, EngineParticle):
+                    self.velocity.x *= -0.8
+                else:
+                    self.velocity.x *= -0.01
             if touch["y"]:
-                self.velocity.y *= -0.8
+                if isinstance(self, EngineParticle):
+                    self.velocity.y *= -0.8
+                else:
+                    self.velocity.y *= -0.01
         else:
             self.pos += self.velocity * dt * METRE
         self.rect.center = tuple(self.pos)
@@ -814,9 +822,8 @@ class Particle:
 
 
 class EngineParticle(Particle):
-    def __init__(self, pos, velocity, timer):
-        super().__init__(pos, velocity, timer)
-        self.colSim = True
+    def __init__(self, pos, velocity, timer, player):
+        super().__init__(pos, velocity, timer, colSim=True, parent=player)
         self.colour = [255, 174, 0, 255]
         self.radius = 2
     def Update(self, dt, gravity, colliders):
@@ -850,9 +857,9 @@ class ParticleHandler:
             if type(obj) == AirStream:
                 if now - obj.lastEmission >= 0.1:
                     velocity = obj.GetForce().GetNormalized() * 30
-                    self.Emit(obj, WHITE, 7, velocity, True, True, obj)
+                    self.Emit(obj, WHITE, 4, velocity, True, True, obj)
                     obj.lastEmission = now
-        print(len([x for x in self.particles if x.colSim]))
+        #print(len([x for x in self.particles if x.colSim]))
 
     def Emit(self, obj, colour, life, velocity, weightless=False, colSim=False, parent=None):
         pos, rect = tuple(obj.GetPos()), obj.GetRect()
@@ -868,8 +875,8 @@ class ParticleHandler:
     def CreateEngineParticles(self, ship, drive):
         for i in range(0, 10):
             x, y = tuple(ship.engine) # Starting pos is the engine
-            uv = drive.Inverse().GetNormalized() + random.uniform(-1, 1)
-            self.Add(EngineParticle(ship.engine, uv, random.uniform(0.5, 0.8)))
+            uv = drive.Inverse().GetNormalized() + Vec2(random.uniform(-1, 1), 0)
+            self.Add(EngineParticle(ship.engine, uv, random.uniform(0.5, 0.8), ship))
 
 class Objective(WorldCollider):
     def __init__(self, pos, width, height, material="Asphalt"):
