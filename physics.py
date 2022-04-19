@@ -474,7 +474,8 @@ class PhysObject:
             pygame.draw.rect(surface, YELLOW, image_rect, 1)
             pygame.draw.circle(surface, RED, self.rect.center, 1)
             #pygame.draw.circle(screen, RED, tuple(self.GetPos() - (self.GetAngleVec() * (Vec2(self.image.get_size()) / 2))), 1)
-            pygame.draw.circle(surface, RED, tuple(self.engine), 1)
+            if isinstance(self, Player):
+                pygame.draw.circle(surface, RED, tuple(self.engine), 1)
     def GetPos(self):
         return self.pos
     def GetCentre(self):

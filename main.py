@@ -337,7 +337,7 @@ class ScoringScreen:
         if self.fuelperc == 0:
             colour = WHITE
         textRender(mediumText, ((swidth / 2), 220 + (self.detailnum * 60)),
-                   f"Fuel conserved: {str(round(self.fuelperc * 100, 1))}% ({str(self.fuelbonus)})", colour)
+                   f"Fuel conserved: {str(round(self.fuelperc * 100, 1))}% ({str(self.fuelbonus if self.score >= 1 else 0)})", colour)
 
         for button in self.buttonList:
             button.Draw()
