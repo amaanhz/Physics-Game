@@ -274,13 +274,14 @@ class Menu:
                 sys.exit()
 
 class ScoringScreen:
-    def __init__(self, stateobj, objectives, timer, collisions, levelnum):
+    def __init__(self, stateobj, objectives, timer, collisions, fuelperc, levelnum):
         self.state = stateobj
         self.totalobj = len(objectives)
         self.objmet = len([x for x in objectives if x.complete])
         self.optimal = OPTIMALS[str(levelnum)]
         self.time = int(timer)
         self.collisions = collisions
+        self.fuelperc = fuelperc
         self.levelnum = int(levelnum)
         self.background_image = pygame.image.load("assets/background/background.png").convert()
 
@@ -288,8 +289,9 @@ class ScoringScreen:
             timeDiff = self.optimal - timer # This will be negative if the player took longer than the optimal
             timeMult = min(abs(timeDiff) / self.optimal, 1) # Only penalise/bonus for up to double the time and down to 0 seconds
             timeMult *= -1 if timeDiff < 0 else 1 # Bonus or penalty
-            self.score = int(SCOREBASE + (SCOREBASE*timeMult) - (HITPENALTY * collisions))
-            self.score = 1 if self.score <= 0 else self.score
+            self.fuelbonus = int(min(self.fuelperc / 0.5, 1) * 1000)
+            self.score = int(SCOREBASE + (SCOREBASE*timeMult) + self.fuelbonus - (HITPENALTY * collisions))
+            self.score = 1 if self.score <= 0 else self.score # If the player succeeded, they should never score 0 points
         else:
             self.score = 0
 
@@ -331,6 +333,11 @@ class ScoringScreen:
                    f"Damaging Collisions: {str(self.collisions)} ({str(-1 * self.collisions * HITPENALTY)})", colour)
         self.detailnum += 1
 
+        colour = GREEN
+        if self.fuelperc == 0:
+            colour = WHITE
+        textRender(mediumText, ((swidth / 2), 220 + (self.detailnum * 60)),
+                   f"Fuel conserved: {str(round(self.fuelperc * 100, 1))}% ({str(self.fuelbonus)})", colour)
 
         for button in self.buttonList:
             button.Draw()
@@ -657,12 +664,12 @@ class Game:
                 completed = False
             objective.Draw(screen)
         if completed:
-            self.state.newstate(ScoringScreen(self.state, objectives, self.timer.GetTime(), player.collisions, self.levelnum))
+            self.state.newstate(ScoringScreen(self.state, objectives, self.timer.GetTime(), player.collisions, self.player.fuel / self.player.tank, self.levelnum))
 
 
         for obstacle in obstacles:
             if obstacle.Update(player):
-                self.state.newstate(ScoringScreen(self.state, objectives, self.timer.GetTime(), player.collisions, self.levelnum))
+                self.state.newstate(ScoringScreen(self.state, objectives, self.timer.GetTime(), player.collisions, self.player.fuel / self.player.tank, self.levelnum))
             obstacle.Draw(screen)
 
         ## UPDATING PLAYER ##

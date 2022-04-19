@@ -416,6 +416,13 @@ class WorldCollider:
 
 class PhysObject:
     def __init__(self, pos, image, mass, Cd=0.5, COR=0):
+        """
+        :param Vec2 pos:
+        :param string image:
+        :param float mass:
+        :param float Cd:
+        :param float COR:
+        """
         self.pos = Vec2(pos[0], pos[1])
         self.angle = 0
         self.angleDir = Vec2(math.cos((90 + self.angle) * RAD), -math.sin((90 - self.angle) * RAD)).GetNormalized()
@@ -580,6 +587,11 @@ class PhysObject:
 
 class Player(PhysObject):
     def __init__(self, pos, image, mass, fuel, thrust, weightlessfuel=False):
+        """
+        :param float fuel:
+        :param float thrust:
+        :param bool weightlessfuel:
+        """
         super().__init__(pos, image, mass, PLAYER_DRAG_COEFFICIENT, 0.2)
         self.fuel, self.tank = fuel, fuel
         self.weightlessfuel = weightlessfuel
@@ -868,7 +880,6 @@ class ParticleHandler:
         y = random.randint(int(pos[1] - (rect.height / 2)), int(pos[1] + (rect.height / 2)))
 
         self.Add(Particle(Vec2(x, y), velocity, life, weightless, colour, 2, colSim, parent))
-
 
     def Add(self, particle):
         self.particles.append(particle)
