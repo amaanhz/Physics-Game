@@ -110,9 +110,9 @@ def touching(obj1, obj2):
     checkx = (rect2.left <= rect1.right and rect2.right >= rect1.left)
     if rect1.left == rect2.right and checky:
         return "left"
-    if rect1.right == rect2.left and checkx:
+    if rect1.right == rect2.left and checky:
         return "right"
-    if rect1.top == rect2.bottom and checky:
+    if rect1.top == rect2.bottom and checkx:
         return "top"
     if rect1.bottom == rect2.top and checkx:
         return "bottom"
@@ -303,14 +303,17 @@ class ForceManager:
             # Contact Check (applies to any force)
             if force.source not in touchingEnts and force.source != self.parent:
                 self.forces.pop(i)
+                continue
 
             # Friction Check
             if force.name == "FrictionX":
                 if v.x == 0 and rForce.x == 0:
                     self.forces.pop(i)
+                    continue
             if force.name == "FrictionY":
                 if v.y == 0 and rForce.y == 0:
                     self.forces.pop(i)
+                    continue
 
 
         ## ADD WEIGHT FORCE IF IT DOESN'T EXIST ##
@@ -810,7 +813,7 @@ def getCameraTrack(pos, lpos, lwidth , lheight):
 
 objects = [PhysObject((100, 100), ball_image, 150, SPHERE_DRAG_COEFFICIENT, True, 0.35)]
 
-for i in range(0, 5):
+for i in range(0, 2):
     objects.append(PhysObject((random.randint(0, swidth - ball_image.get_width()), random.randint(0, sheight - ball_image.get_height())), ball_image, 150, SPHERE_DRAG_COEFFICIENT, True, 0.35))
 
 
