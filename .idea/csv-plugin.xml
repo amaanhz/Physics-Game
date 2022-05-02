@@ -52,6 +52,20 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\levels\2\constants.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\levels\2\hazards.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\levels\2\objectives.csv">
           <value>
             <Attribute>
@@ -60,6 +74,13 @@
           </value>
         </entry>
         <entry key="\levels\2\objects.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\levels\2\obstacles.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -80,7 +101,49 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\levels\3\constants.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\levels\3\hazards.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\levels\3\objectives.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\levels\3\objects.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\levels\3\obstacles.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\levels\3\player.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\levels\3\world.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

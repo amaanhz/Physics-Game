@@ -278,14 +278,17 @@ class ForceManager:
             # Contact Check (applies to any force)
             if force.source not in touchingEnts and force.source != self.parent and force.name != "Wind":
                 self.forces.pop(i)
+                continue
 
             # Friction Check
             if force.name == "FrictionX":
                 if v.x == 0 and rForce.x == 0:
                     self.forces.pop(i)
+                    continue
             if force.name == "FrictionY":
                 if v.y == 0 and rForce.y == 0:
                     self.forces.pop(i)
+                    continue
 
 
         ## ADD WEIGHT FORCE IF IT DOESN'T EXIST ##
@@ -864,7 +867,7 @@ class ParticleHandler:
         for obj in world:
             now = time.time()
             if isinstance(obj, KeyObject) or isinstance(obj, Objective):
-                if now - obj.lastEmission >= 0.1:
+                if now - obj.lastEmission >= 0.5:
                     self.Emit(obj, obj.colour, 3, Vec2(random.uniform(-1, 1), random.uniform(-5, -2)), True, False, obj)
                     obj.lastEmission = now
             if type(obj) == AirStream:

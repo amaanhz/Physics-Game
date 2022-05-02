@@ -531,7 +531,6 @@ class LevelSelect:
             self.splitLevels.append(self.levels[insert:insert+5])
         if len(self.levels) % 5 != 0:
             self.splitLevels.append(self.levels[-(len(self.levels) % 5)::1])
-        print(self.splitLevels)
 
         self.backButton = MenuButton("<", (20, 20), swidth/8, 50)
         self.buttonList = []
@@ -596,8 +595,9 @@ class Game:
         font = pygame.font.Font(None, 30)
         #render_fps = font.render(str(int(clock.get_fps())), True, WHITE)
         #screen.blit(render_fps, (0, 0))
-        render_mousepos = font.render(str(pygame.mouse.get_pos()), True, WHITE)
-        screen.blit(render_mousepos, (500, 0))
+        if DEBUG:
+            render_mousepos = font.render(str(pygame.mouse.get_pos()), True, WHITE)
+            screen.blit(render_mousepos, (500, 0))
         fuelBackgroundRect = pygame.Rect(0, 0, int(0.75 * swidth), int(0.01 * sheight))
         fuelRect = pygame.Rect(0, 0, int(0.75 * swidth * self.player.fuel / self.player.tank), int(0.015 * sheight))
 

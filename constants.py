@@ -1,6 +1,6 @@
 import pygame, math, os
 
-DEBUG = True
+DEBUG = False
 DEBUG_LEVEL = 1
 
 WHITE = (255, 255, 255)
