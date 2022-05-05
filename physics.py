@@ -21,10 +21,14 @@ MATERIALS = {
 
 def trace(source, dir, target, LEVEL_SIZE, detailed=False):
     """
+    Traces a straight line from a source in a direction (unit vector) and checks for a hit with another object
+
     :param source: A source point or object
     :param dir: Normalized vector representing direction of the ray
     :type dir: Vec2
     :param target: What to test for ray collision on
+    :param LEVEL_SIZE: The size of the level in pixels/coordinates
+    :type LEVEL_SIZE: tuple
     :param detailed: Detailed info about the hit
     :return: Whether a hit was registered
     """
@@ -35,11 +39,11 @@ def trace(source, dir, target, LEVEL_SIZE, detailed=False):
     width, height = WINDOW_SIZE
     xDir = int(identity(dir).x)
     end_pos = (0, 0)
-    if xDir != 0:
-        gradient = dir.y / dir.x
-        bounds = [int(source.x), LEVEL_SIZE[0] if xDir == 1 else -LEVEL_SIZE[0]]
-        for x in range(bounds[0], bounds[1], xDir):
-            y = x * gradient + source.y
+    if xDir != 0: # If the line is not completely vertical; has a gradient
+        gradient = dir.y / dir.x # dy/dx
+        bounds = [int(source.x), LEVEL_SIZE[0] if xDir == 1 else -LEVEL_SIZE[0]] # How far we should draw the line along the x-axis; always an overestimate
+        for x in range(bounds[0], bounds[1], xDir): # Increment along the axis axis by an amount equal to the gradient
+            y = x * gradient + source.y # y = mx + c ; c == source.y because the line is transformed an amount up the y axis by source.y
 
             if DEBUG and x == bounds[1] - xDir:
                 end_pos = (x, int(y))
@@ -47,11 +51,11 @@ def trace(source, dir, target, LEVEL_SIZE, detailed=False):
             if target is not None:
                 if target.collidepoint(x, y):
                     return True
-    else:
+    else: # If the line is completely vertical; has no gradient
         yDir = int(identity(dir).y)
         bounds = [int(source.y), LEVEL_SIZE[1] if yDir == 1 else -LEVEL_SIZE[1]]
         for y in range(bounds[0], bounds[1], yDir):
-
+            # vertical line given by x=k, where k is source.x
             if DEBUG and y == bounds[1] - yDir:
                 end_pos = (source.x, y)
                 pygame.draw.aaline(screen, RED, (source.x, source.y), end_pos)
@@ -62,6 +66,13 @@ def trace(source, dir, target, LEVEL_SIZE, detailed=False):
 
 
 def coltest(rect, colliders):
+    """
+    Test collisions between a single object and a list of others
+
+    :param rect: Rect/Object
+    :param colliders: List of rects/objects
+    :return: A list of all the objects/rects from colliders that 'rect' collided with
+    """
     hit_list = []
     for collider in colliders:
         if rect.colliderect(collider.GetRect()):
@@ -70,13 +81,18 @@ def coltest(rect, colliders):
 
 def touching(obj1, obj2):
     """
+    Test for edge collisions, and determine which sides are involved.
+
     :param obj1: Object 1
     :param obj2: Object 2
     :return: The side of obj1 which obj2 is touching, or False.
     """
     rect1, rect2 = obj1.GetRect(), obj2.GetRect()
+
+    # Ensuring rects are in the correct position relative to eachother to be able to touch:
     checky = (rect2.top <= rect1.bottom and rect2.bottom >= rect1.top)
     checkx = (rect2.left <= rect1.right and rect2.right >= rect1.left)
+
     if rect1.left == rect2.right and checky:
         return "left"
     if rect1.right == rect2.left and checky:
@@ -88,6 +104,13 @@ def touching(obj1, obj2):
     return False
 
 def touchingany(ent, colliders):
+    """
+    Same as touching, but for several objects.
+
+    :param ent: Any object
+    :param colliders: List of other objects
+    :return: A list of tuple pairs with objects and the side which the ent is touching
+    """
     entRect = ent.GetRect()
     entsides = [entRect.left, entRect.top, entRect.right, entRect.bottom]
     collisions = []
@@ -476,7 +499,6 @@ class PhysObject:
             image_rect.center = self.rect.center
             pygame.draw.rect(surface, YELLOW, image_rect, 1)
             pygame.draw.circle(surface, RED, self.rect.center, 1)
-            #pygame.draw.circle(screen, RED, tuple(self.GetPos() - (self.GetAngleVec() * (Vec2(self.image.get_size()) / 2))), 1)
             if isinstance(self, Player):
                 pygame.draw.circle(surface, RED, tuple(self.engine), 1)
     def GetPos(self):
@@ -652,17 +674,6 @@ class Collision:
             trace(source, obj1.GetVelocity().GetNormalized(), obj2, level_size)
         else:
             return False
-    # def seperate(self):
-    #     obj1, obj2 = self.object, self.collider
-    #     v1, v2 = obj1.GetVelocity(), obj2.GetVelocity()
-    #     v1Norm, v2Norm = v1.GetNormalized(), v2.GetNormalized()
-    #     v1Mag, v2Mag = v1.GetMag(), v2.GetMag()
-    #     totalVelocity = v1Mag + v2Mag
-    #     v1Perc, v2Perc = v1Mag / totalVelocity if totalVelocity != 0 else 0, v2Mag / totalVelocity if totalVelocity != 0 else 0
-    #     obj1Offset, obj2Offset = v1 * v1Perc, v2 * v2Perc
-    #     while self.object.GetRect().colliderect(self.collider.GetRect()):
-    #         obj1.SetPos(obj1.GetPos() + obj1Offset)
-    #         obj2.SetPos(obj2.GetPos() + obj2Offset)
 
     def Resolve(self):
         obj1 = self.object
@@ -675,8 +686,6 @@ class Collision:
         obj1.SetVelocityVec2(finalObj1V)
         obj2.SetVelocityVec2(finalObj2V)
         self.resolved = True
-
-        #self.seperate()
 
     def CheckOverlap(self):
         return self.object.GetRect().colliderect(self.collider.GetRect()) or touching(self.object, self.collider)
@@ -947,19 +956,19 @@ class AirStream(WorldCollider):
         self.oldPos = copy.deepcopy(self.pos)
 
         if streamWidth != 0:
-            if streamWidth > 0:
-                self.streamRect = pygame.Rect(*self.rect.topright, streamWidth, height)
+            if streamWidth > 0: # If its a horizontal airstream
+                self.streamRect = pygame.Rect(*self.rect.topright, streamWidth, height) # Going to the right
             else:
-                self.streamRect = pygame.Rect(pos.x + streamWidth, pos.y, -streamWidth, height)
+                self.streamRect = pygame.Rect(pos.x + streamWidth, pos.y, -streamWidth, height) # Going to the left
         else:
-            if streamHeight > 0:
-                self.streamRect = pygame.Rect(*self.rect.bottomleft, width, streamHeight)
+            if streamHeight > 0: # If its a vertical airstream
+                self.streamRect = pygame.Rect(*self.rect.bottomleft, width, streamHeight) # Going down
             else:
-                self.streamRect = pygame.Rect(pos.x, pos.y + streamHeight, width, -streamHeight)
+                self.streamRect = pygame.Rect(pos.x, pos.y + streamHeight, width, -streamHeight) # Going up
 
     def Update(self, objects):
         for obj in objects:
-            if self.streamRect.contains(obj.GetRect()) or self.streamRect.colliderect(obj.GetRect()):
+            if self.streamRect.contains(obj.GetRect()) or self.streamRect.colliderect(obj.GetRect()): # If the object is within the airstream's zone
                 obj.AddForce(self, "Wind", self.force)
             else:
                 obj.RemoveForce(self, "Wind")
