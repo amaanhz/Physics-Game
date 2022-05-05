@@ -233,9 +233,9 @@ class Force(Vec2):
     def __init__(self, source, name, *args):
         self.source = source
         self.name = name
-        if len(args) == 1:
+        if len(args) == 1: # in case the components are passed as a tuple/list
             self.x, self.y = args[0].x, args[0].y
-        if len(args) == 2:
+        if len(args) == 2: # if the components are passed seperately
             self.x, self.y = args[0], args[1]
 
 class ForceManager:
@@ -654,7 +654,6 @@ class Collision:
         self.object = object
         self.collider = collider
         self.resolved = False
-        # self.worldCollision = isinstance(self.object, WorldCollider) or isinstance(self.collider, WorldCollider)
     def __eq__(self, other):
         return self.object == other.object and self.collider == other.collider or \
                self.object == other.collider and self.collider == other.object
@@ -739,6 +738,17 @@ class CollisionHandler:
 
     @staticmethod
     def SafeMove(object, colliders, delta):
+        """
+        Conducts movement with respect to collisions that occur with any objects in the 'colliders' list.
+
+        :param object: Subject of movement
+        :param colliders: All other collidable objects
+        :type colliders: list
+        :param delta: How much the subject is desired to be moved by
+        :type delta: Vec2
+        :return: Dictionary containing which sides were hit and the objects involved in them
+        """
+
         returnVals = {"x": False,
                       "y": False,
                       "objectX": None,
@@ -758,7 +768,7 @@ class CollisionHandler:
         for entity in hit_list:
             if delta.x > 0 and oldRect.right <= entity.rect.left:
                 object.rect.right = entity.GetRect().left
-                object.pos = Vec2(object.rect.center)
+                object.pos = Vec2(object.rect.center) # object's internal pos attribute must be adjusted accordingly
 
             elif delta.x < 0 and oldRect.left >= entity.rect.right:
                 object.rect.left = entity.GetRect().right
@@ -820,7 +830,7 @@ class Particle:
         if self.colSim:
             if self.parent is not None and self.parent in world:
                 world.remove(self.parent)
-            touch = CollisionHandler.SafeMove(self, world, self.velocity * dt * METRE)
+            touch = CollisionHandler.SafeMove(self, world, self.velocity * dt * METRE) # returns dictionary with sides that were touched
             if touch["x"]:
                 if isinstance(self, EngineParticle):
                     self.velocity.x *= -0.8
@@ -854,7 +864,7 @@ class EngineParticle(Particle):
     def Update(self, dt, gravity, colliders):
         super().Update(dt, gravity, colliders)
         if self.elapsed < self.timer:
-            frac = self.elapsed / self.timer
+            frac = self.elapsed / self.timer # How white the particle should be
             self.colour[1] = lINTerp(174, 255, frac)
             self.colour[2] = lINTerp(0, 255, frac)
             self.colour[3] = lINTerp(0, 255, frac)
@@ -867,7 +877,7 @@ class ParticleHandler:
     def Update(self, screen, world, gravity, dt):
         for i, particle in enumerate(self.particles):
             particle.Update(dt, gravity, world)
-            if particle.elapsed >= particle.timer != 0:
+            if particle.elapsed >= particle.timer != 0: # if particle.timer == 0 it is an infinite particle; will not expire
                 self.particles.pop(i)
 
         for particle in self.particles:
@@ -876,15 +886,14 @@ class ParticleHandler:
         for obj in world:
             now = time.time()
             if isinstance(obj, KeyObject) or isinstance(obj, Objective):
-                if now - obj.lastEmission >= 0.5:
-                    self.Emit(obj, obj.colour, 3, Vec2(random.uniform(-1, 1), random.uniform(-5, -2)), True, False, obj)
+                if now - obj.lastEmission >= 0.5: # Map objects emit particles every ~0.5 seconds
+                    self.Emit(obj, obj.colour, 3, Vec2(random.uniform(-1, 1), random.uniform(-5, -2)), True, False, obj) # Emit particles generally in the upwards direction
                     obj.lastEmission = now
             if type(obj) == AirStream:
-                if now - obj.lastEmission >= 0.1:
+                if now - obj.lastEmission >= 0.1: # Airstream particles are released at 0.1 second intervals
                     velocity = obj.GetForce().GetNormalized() * 30
                     self.Emit(obj, WHITE, 4, velocity, True, True, obj)
                     obj.lastEmission = now
-        #print(len([x for x in self.particles if x.colSim]))
 
     def Emit(self, obj, colour, life, velocity, weightless=False, colSim=False, parent=None):
         pos, rect = tuple(obj.GetPos()), obj.GetRect()
